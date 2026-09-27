@@ -11,7 +11,7 @@ as a percentage of the target. Each month can be recorded only once.
 ## Architecture
 
 ```
-Angular SPA  ──HTTP/JSON──▶  ASP.NET Core Web API  ──ADO.NET──▶  MySQL (stored procedures)
+Angular SPA  ──HTTP/JSON──▶  ASP.NET Core Web API  ──Dapper──▶  MySQL (schema via DbUp migrations)
 ```
 
 The API is split into layers, each with one responsibility:
@@ -20,7 +20,8 @@ The API is split into layers, each with one responsibility:
 |---|---|---|
 | Controllers | `Controllers/` | HTTP endpoints, request validation, status codes |
 | Services | `Services/` | Business logic; coordinates repositories |
-| Repositories | `Repositories/` | Data access through MySQL stored procedures and parameterised queries |
+| Repositories | `Repositories/` | Data access with Dapper and parameterised SQL |
+| Data | `Data/` | Connection factory, unit of work, migrator and development seeder |
 | DTOs | `DTO/` | Request shapes accepted by the API |
 | Models | `Models/` | Domain entities returned by services and repositories |
 
@@ -28,14 +29,20 @@ Services and repositories are defined by interfaces (`Services/Interfaces`, `Rep
 and registered with dependency injection in `Program.cs`, so each layer depends on abstractions
 rather than concrete classes.
 
+All repositories in a request share one connection and, when a service needs it, one transaction,
+through a scoped `IUnitOfWork`. Only `IDbConnectionFactory` creates connections. Unhandled exceptions
+are returned as RFC 7807 ProblemDetails by a global exception handler. See
+[docs/database.md](docs/database.md) for the schema, an ER diagram and the design decisions.
+
 The Angular frontend uses standalone components (login, profile, goals, dashboard header) and
 services that call the API, with a route guard protecting the dashboard pages.
 
 ## Tech stack
 
-- **Backend:** ASP.NET Core 10 Web API, MySql.Data (ADO.NET), Swagger (Swashbuckle)
+- **Backend:** ASP.NET Core 10 Web API, Dapper, MySqlConnector, DbUp, Swagger (Swashbuckle)
 - **Frontend:** Angular 18, Angular Material, RxJS
-- **Database:** MySQL 8.4 in Docker, with schema, stored procedures and seed data as SQL scripts
+- **Database:** MySQL 8.4 in Docker; schema managed by versioned DbUp migrations
+- **Tests:** xUnit, Moq, Testcontainers (MySQL)
 - **Tooling:** .NET 10 SDK (pinned in `backend/global.json`), Node 20 (`frontend/.nvmrc`), Docker Compose
 
 ## Project structure
@@ -47,14 +54,18 @@ backend/
   RetirementPlanner.Api/
     Controllers/                User, Goal and FinancialData endpoints
     Services/                   Business logic (+ Interfaces/)
-    Repositories/               Data access (+ Interfaces/)
+    Repositories/               Data access with Dapper (+ Interfaces/)
+    Data/                       Connection factory, unit of work, migrator, dev seeder (+ Interfaces/)
+    Migrations/                 Versioned SQL migrations (V001__..., embedded, run on startup)
+    Infrastructure/             Global exception handler (ProblemDetails)
     DTO/                        Request models
     Models/                     Domain models
-    Program.cs                  DI registration, CORS, Swagger
-database/
-  01_schema.sql                 Tables
-  02_procedures.sql             Stored procedures
-  03_seed.sql                   Demo user
+    Program.cs                  DI registration, migrations, CORS, Swagger
+  RetirementPlanner.Tests/
+    Services/ Infrastructure/   Unit tests with mocked repositories
+    Integration/                Repository and migration tests against MySQL in Testcontainers
+docker/mysql-init/              Creates the empty database on first container start
+docs/database.md                Schema, ER diagram and design decisions
 frontend/
   src/app/
     login/ profile/ goals/ dashboard/   Components
@@ -76,9 +87,10 @@ docker compose up -d
 docker compose ps       # wait until the mysql service shows "healthy"
 ```
 
-On first start the container creates the `retirement_planner` database and the `rpt_app` user
-from `.env`, then runs the scripts in `database/` in order. The data lives in the `mysql-data`
-volume. To wipe it and re-run the scripts: `docker compose down -v && docker compose up -d`.
+On first start the container creates the empty `retirement_planner` database and the
+`retirement_planner_app` user from `.env`. The API creates the tables itself: it applies any pending
+migrations from `Migrations/` on startup. The data lives in the `mysql-data` volume. To start from an
+empty database: `docker compose down -v && docker compose up -d`.
 
 Compose publishes the container's port 3306 on host port **3307**, so it does not clash with a
 local MySQL server on 3306.
@@ -88,9 +100,11 @@ local MySQL server on 3306.
 ```bash
 cd backend/RetirementPlanner.Api
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
-  "Server=localhost;Port=3307;Database=retirement_planner;User=rpt_app;Password=<MYSQL_PASSWORD from .env>;"
+  "Server=localhost;Port=3307;Database=retirement_planner;User=retirement_planner_app;Password=<MYSQL_PASSWORD from .env>;"
 dotnet run --launch-profile http
 ```
+
+In the Development environment the API also seeds a demo user on startup.
 
 ### 3. Frontend (http://localhost:4200)
 
@@ -101,13 +115,20 @@ npm install
 npm start
 ```
 
-Log in with `demo` / `demo123`.
+Log in with `demo@example.com` / `demo123`.
+
+### Tests
+
+```bash
+cd backend
+dotnet test    # unit tests, plus integration tests that start MySQL with Testcontainers (Docker must be running)
+```
 
 ## API
 
 | Method | Route | Purpose |
 |---|---|---|
-| POST | `/api/user/login` | Validate credentials, return profile |
+| POST | `/api/user/login` | Validate email and password, return profile |
 | GET | `/api/goal/{profileId}` | Get the profile's goal |
 | POST | `/api/goal` | Create a goal (one per profile) |
 | POST | `/api/financial/Add-Investment` | Record a month's investment (409 if already recorded) |

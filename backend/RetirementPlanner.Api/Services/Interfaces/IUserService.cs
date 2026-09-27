@@ -4,6 +4,7 @@ namespace RetirementPlanner.Services.Interfaces
 {
     public interface IUserService
     {
-        Task<Profile?> AuthenticateAsync(string username, string password);
+        /// <summary>Returns the user's profile when the email and password match, otherwise null.</summary>
+        Task<Profile?> AuthenticateAsync(string email, string password, CancellationToken cancellationToken = default);
     }
 }

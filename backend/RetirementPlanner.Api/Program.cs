@@ -1,9 +1,10 @@
-using RetirementPlanner.Services;
-using RetirementPlanner.Services.Interfaces;
-using RetirementPlanner.Repositories.Interfaces;
-using RetirementPlanner.Repositories;
+using RetirementPlanner.Data.Interfaces;
+using RetirementPlanner.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
 
 // CORS for the Angular dev server
 builder.Services.AddCors(options =>
@@ -16,15 +17,12 @@ builder.Services.AddCors(options =>
     });
 });
 
-// Repositories
-builder.Services.AddScoped<IGoalRepository, GoalRepository>();
-builder.Services.AddScoped<IFinancialYearDataRepo, FinancialYearDataRepo>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
+// Data access, repositories and services
+builder.Services.AddRetirementPlanner(connectionString);
 
-// Services
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IGoalService, GoalService>();
-builder.Services.AddScoped<IFinancialYearDataService, FinancialYearDataService>();
+// Unhandled exceptions become RFC 7807 ProblemDetails
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 // Swagger & Controllers
 builder.Services.AddControllers();
@@ -33,13 +31,22 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+app.Services.GetRequiredService<IDatabaseMigrator>().Migrate();
+
 if (app.Environment.IsDevelopment())
 {
+    await using (var scope = app.Services.CreateAsyncScope())
+    {
+        await scope.ServiceProvider.GetRequiredService<IDataSeeder>().SeedAsync();
+    }
+
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+// CORS runs first so its headers are also added to error responses from the exception handler.
 app.UseCors("AllowFrontend");
+app.UseExceptionHandler();
 app.UseAuthorization();
 app.MapControllers();
 
