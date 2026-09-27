@@ -1,15 +1,16 @@
-using RetirementPlanner.Models;
 using RetirementPlanner.DTO;
+using RetirementPlanner.Models;
 
 namespace RetirementPlanner.Services.Interfaces
 {
     public interface IGoalService
     {
-        Task<Goal?> GetGoalByIdAsync(int id);
-        Task<bool> GoalExistsAsync(int goalId);
-        Task<bool> ExistsByProfileIdAsync(int profileId);
-        Task<bool> CreateGoalAsync(GoalDTO goal);
-        Task<int?> GetProfileIdByGoalIdAsync(int goalId);
-        Task<decimal?> GetGoalProgressByGoalIdAsync(int goalId);
+        /// <summary>The user's goal (their most recent one), or null if they have none.</summary>
+        Task<Goal?> GetGoalForUserAsync(int userId, CancellationToken cancellationToken = default);
+        Task<Goal?> GetGoalAsync(int goalId, CancellationToken cancellationToken = default);
+        Task<GoalCreationResult> CreateGoalAsync(GoalDTO goal, CancellationToken cancellationToken = default);
+
+        /// <summary>Current savings as a percentage of the target, or null if the goal doesn't exist.</summary>
+        Task<decimal?> GetProgressAsync(int goalId, CancellationToken cancellationToken = default);
     }
 }

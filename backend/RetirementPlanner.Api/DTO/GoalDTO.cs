@@ -7,5 +7,12 @@ namespace RetirementPlanner.DTO
         public int RetirementAge { get; set; }
         public decimal TargetSavings { get; set; }
         public decimal CurrentSavings { get; set; }
+
+        // Optional; GoalService fills in defaults when these are omitted.
+        public string? Name { get; set; }
+        public decimal? ExpectedAnnualReturn { get; set; }
+        public decimal? ReturnVolatility { get; set; }
+        public decimal? InflationRate { get; set; }
+        public decimal? AnnualContributionIncrease { get; set; }
     }
 }

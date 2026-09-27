@@ -1,118 +1,94 @@
+using RetirementPlanner.Data.Interfaces;
+using RetirementPlanner.DTO;
 using RetirementPlanner.Models;
 using RetirementPlanner.Repositories.Interfaces;
 using RetirementPlanner.Services.Interfaces;
-using RetirementPlanner.DTO;
 
 namespace RetirementPlanner.Services
 {
     public class GoalService : IGoalService
     {
+        // Used when the request doesn't provide the simulation inputs.
+        public const string DefaultName = "Retirement";
+        public const decimal DefaultExpectedAnnualReturn = 0.06m;
+        public const decimal DefaultReturnVolatility = 0.12m;
+        public const decimal DefaultInflationRate = 0.025m;
+        public const decimal DefaultAnnualContributionIncrease = 0m;
+
+        private readonly IUnitOfWork _unitOfWork;
         private readonly IGoalRepository _goalRepo;
+        private readonly IUserRepository _userRepo;
         private readonly ILogger<GoalService> _logger;
 
-        public GoalService(IGoalRepository goalRepo, ILogger<GoalService> logger)
+        public GoalService(
+            IUnitOfWork unitOfWork,
+            IGoalRepository goalRepo,
+            IUserRepository userRepo,
+            ILogger<GoalService> logger)
         {
+            _unitOfWork = unitOfWork;
             _goalRepo = goalRepo;
+            _userRepo = userRepo;
             _logger = logger;
         }
 
-        public async Task<Goal?> GetGoalByIdAsync(int id)
-        {
-            _logger.LogInformation("Fetching goal with ID: {ProfileId}", id);
-            try
+        public Task<Goal?> GetGoalForUserAsync(int userId, CancellationToken cancellationToken = default) =>
+            _goalRepo.GetLatestByUserIdAsync(userId, cancellationToken);
+
+        public Task<Goal?> GetGoalAsync(int goalId, CancellationToken cancellationToken = default) =>
+            _goalRepo.GetByIdAsync(goalId, cancellationToken);
+
+        public Task<GoalCreationResult> CreateGoalAsync(GoalDTO goal, CancellationToken cancellationToken = default) =>
+            _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
-                var goal = await _goalRepo.GetByProfileIdAsync(id);
-                if (goal == null)
+                // Locking the user serialises concurrent requests, so the one-goal check below can't race.
+                if (!await _userRepo.TryLockAsync(goal.ProfileId, cancellationToken))
+                    return GoalCreationResult.UserNotFound;
+
+                if (await _goalRepo.ExistsForUserAsync(goal.ProfileId, cancellationToken))
+                    return GoalCreationResult.AlreadyExists;
+
+                var goalId = await _goalRepo.CreateAsync(new NewGoal
                 {
-                    _logger.LogWarning("Goal with ID {ProfileId} not found", id);
-                }
-                return goal;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving goal with ID: {ProfileId}", id);
-                throw;
-            }
+                    UserId = goal.ProfileId,
+                    Name = string.IsNullOrWhiteSpace(goal.Name) ? DefaultName : goal.Name.Trim(),
+                    CurrentAge = goal.CurrentAge,
+                    RetirementAge = goal.RetirementAge,
+                    TargetAmount = goal.TargetSavings,
+                    CurrentSavings = goal.CurrentSavings,
+                    ExpectedAnnualReturn = goal.ExpectedAnnualReturn ?? DefaultExpectedAnnualReturn,
+                    ReturnVolatility = goal.ReturnVolatility ?? DefaultReturnVolatility,
+                    InflationRate = goal.InflationRate ?? DefaultInflationRate,
+                    AnnualContributionIncrease = goal.AnnualContributionIncrease ?? DefaultAnnualContributionIncrease,
+                    PlannedMonthlyContribution = CalculateMonthlyContribution(
+                        goal.TargetSavings, goal.CurrentSavings, goal.CurrentAge, goal.RetirementAge)
+                }, cancellationToken);
+
+                _logger.LogInformation("Created goal {GoalId} for user {UserId}", goalId, goal.ProfileId);
+                return GoalCreationResult.Created;
+            }, cancellationToken);
+
+        public async Task<decimal?> GetProgressAsync(int goalId, CancellationToken cancellationToken = default)
+        {
+            var goal = await _goalRepo.GetByIdAsync(goalId, cancellationToken);
+            if (goal == null || goal.TargetSavings == 0)
+                return null;
+
+            return goal.CurrentSavings / goal.TargetSavings * 100;
         }
 
-        public async Task<bool> ExistsByProfileIdAsync(int profileId)
+        /// <summary>
+        /// What must be saved each month to close the gap by retirement, ignoring returns.
+        /// Rounds half away from zero, as MySQL's ROUND did in the old CreateGoal procedure.
+        /// </summary>
+        public static decimal CalculateMonthlyContribution(
+            decimal targetSavings, decimal currentSavings, int currentAge, int retirementAge)
         {
-            _logger.LogInformation("Checking if profile exists: {ProfileId}", profileId);
-            try
-            {
-                return await _goalRepo.ExistsByProfileIdAsync(profileId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error checking existence for ProfileId: {ProfileId}", profileId);
-                throw;
-            }
-        }
+            var months = (retirementAge - currentAge) * 12;
+            if (months <= 0)
+                throw new ArgumentException("Retirement age must be greater than current age.");
 
-        public async Task<bool> GoalExistsAsync(int goalId)
-        {
-            _logger.LogInformation("Checking if goal exists: {GoalId}", goalId);
-            try
-            {
-                return await _goalRepo.ExistsByGoalIdAsync(goalId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error checking existence for GoalId: {GoalId}", goalId);
-                throw;
-            }
-        }
-
-        public async Task<bool> CreateGoalAsync(GoalDTO goal)
-        {
-            _logger.LogInformation("Creating new goal for ProfileId: {ProfileId}", goal.ProfileId);
-            try
-            {
-                var result = await _goalRepo.CreateAsync(goal);
-                if (!result)
-                {
-                    _logger.LogWarning("Failed to create goal for ProfileId: {ProfileId}", goal.ProfileId);
-                }
-                return result;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating goal for ProfileId: {ProfileId}", goal.ProfileId);
-                return false;
-            }
-        }
-
-        public async Task<int?> GetProfileIdByGoalIdAsync(int goalId)
-        {
-            return await _goalRepo.GetProfileIdByGoalIdAsync(goalId);
-        }
-
-        public async Task<decimal?> GetGoalProgressByGoalIdAsync(int goalId)
-        {
-            _logger.LogInformation("Calculating progress for GoalId: {GoalId}", goalId);
-            try
-            {
-                var goal = await _goalRepo.GetByGoalIdAsync(goalId);
-                if (goal == null || goal.TargetSavings == 0)
-                {
-                    _logger.LogWarning("Goal not found or TargetSavings is zero for GoalId: {GoalId}", goalId);
-                    return null;
-                }
-
-                var totalSavings = await _goalRepo.GetUserProgressAsync(goalId);
-                if (totalSavings == null)
-                {
-                    _logger.LogWarning("No progress data found for GoalId: {GoalId}", goalId);
-                    return null;
-                }
-
-                return (totalSavings.Value / goal.TargetSavings) * 100;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error calculating progress for GoalId: {GoalId}", goalId);
-                throw;
-            }
+            return Math.Round((targetSavings - currentSavings) / months, 2, MidpointRounding.AwayFromZero);
         }
     }
 }

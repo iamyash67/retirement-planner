@@ -1,4 +1,5 @@
-using MySql.Data.MySqlClient;
+using Dapper;
+using RetirementPlanner.Data.Interfaces;
 using RetirementPlanner.Models;
 using RetirementPlanner.Repositories.Interfaces;
 
@@ -6,52 +7,46 @@ namespace RetirementPlanner.Repositories
 {
     public class UserRepository : IUserRepository
     {
-        private readonly IConfiguration _config;
-        private readonly ILogger<UserRepository> _logger;
-        private readonly string _connString;
+        private readonly IUnitOfWork _unitOfWork;
 
-        public UserRepository(IConfiguration config, ILogger<UserRepository> logger)
+        public UserRepository(IUnitOfWork unitOfWork)
         {
-            _config = config;
-            _logger = logger;
-            _connString = _config.GetConnectionString("DefaultConnection");
+            _unitOfWork = unitOfWork;
         }
 
-        public async Task<Profile?> ValidateCredentialsAsync(string username, string password)
+        public async Task<User?> GetByEmailAsync(string email, CancellationToken cancellationToken = default)
         {
-            await using var conn = new MySqlConnection(_connString);
-            try
-            {
-                await conn.OpenAsync();
-                using var cmd = new MySqlCommand("CALL ValidateLogin(@UserName,@Password)", conn);
-                cmd.Parameters.AddWithValue("@UserName", username);
-                cmd.Parameters.AddWithValue("@Password", password);
+            const string sql = """
+                SELECT Id, Email, PasswordHash, CreatedAt
+                FROM Users
+                WHERE Email = @Email
+                """;
 
-                using var reader = await cmd.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
-                {
-                    return new Profile
-                    {
-                        ProfileId = reader.GetInt32(reader.GetOrdinal("ProfileId")),
-                        FirstName = reader.GetString(reader.GetOrdinal("FirstName")),
-                        LastName = reader.GetString(reader.GetOrdinal("LastName")),
-                        Age = reader.GetInt32(reader.GetOrdinal("Age")),
-                        Gender = reader.GetString(reader.GetOrdinal("Gender")),
-                        UserName = reader.GetString(reader.GetOrdinal("UserName")),
-                    };
-                }
-                return null;
-            }
-            catch (MySqlException ex)
-            {
-                _logger.LogError(ex, "MySQL error validating credentials for {Username}", username);
-                return null;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "General error validating credentials for {Username}", username);
-                return null;
-            }
+            var connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
+            return await connection.QuerySingleOrDefaultAsync<User>(
+                new CommandDefinition(sql, new { Email = email }, _unitOfWork.Transaction, cancellationToken: cancellationToken));
+        }
+
+        public async Task<int> CreateAsync(string email, string passwordHash, CancellationToken cancellationToken = default)
+        {
+            const string sql = """
+                INSERT INTO Users (Email, PasswordHash) VALUES (@Email, @PasswordHash);
+                SELECT LAST_INSERT_ID();
+                """;
+
+            var connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
+            return await connection.ExecuteScalarAsync<int>(
+                new CommandDefinition(sql, new { Email = email, PasswordHash = passwordHash }, _unitOfWork.Transaction, cancellationToken: cancellationToken));
+        }
+
+        public async Task<bool> TryLockAsync(int userId, CancellationToken cancellationToken = default)
+        {
+            const string sql = "SELECT Id FROM Users WHERE Id = @UserId FOR UPDATE";
+
+            var connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
+            var id = await connection.ExecuteScalarAsync<int?>(
+                new CommandDefinition(sql, new { UserId = userId }, _unitOfWork.Transaction, cancellationToken: cancellationToken));
+            return id.HasValue;
         }
     }
 }
