@@ -1,0 +1,40 @@
+<div class="dashboard-header">
+  <div class="dashboard-title">Retirement Planner</div>
+</div>
+
+<mat-card class="login-card">
+  <mat-card-header>
+    <mat-card-title>Login</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" autocomplete="off">
+
+      <!-- Username Field with Icon -->
+      <mat-form-field appearance="fill">
+        <mat-label>Username</mat-label>
+        <mat-icon matPrefix>person</mat-icon>
+        <input matInput formControlName="username" required name="custom-username" autocomplete="off">
+      </mat-form-field>
+
+      <!-- Password Field with Icon -->
+      <mat-form-field appearance="fill">
+        <mat-label>Password</mat-label>
+        <mat-icon matPrefix>lock</mat-icon>
+        <input matInput type="password" formControlName="password" required name="custom-password" autocomplete="off">
+      </mat-form-field>
+
+      <!-- Error Message -->
+      <div *ngIf="errorMessage" class="error-message">
+        {{ errorMessage }}
+      </div>
+
+      <!-- Submit Button with Spinner -->
+      <button mat-raised-button color="primary" type="submit" [disabled]="!loginForm.valid || isLoading">
+        <div class="button-content">
+          <span *ngIf="!isLoading">Login</span>
+          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
+        </div>
+      </button>
+    </form>
+  </mat-card-content>
+</mat-card>

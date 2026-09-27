@@ -1,0 +1,33 @@
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(90deg, #42a5f5, #26c6da);
+  padding: 20px 28px;
+  border-radius: 12px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  margin: 0 auto 24px auto;
+  color: white;
+}
+
+/* Title */
+.dashboard-title {
+  font-size: 1.8rem;
+  font-weight: 600;
+  font-family: 'Poppins', sans-serif;
+}
+
+/* Button group */
+.dashboard-buttons button {
+  margin-left: 16px;
+  background-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 6px 16px;
+  transition: background-color 0.2s ease;
+}
+
+.dashboard-buttons button:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}

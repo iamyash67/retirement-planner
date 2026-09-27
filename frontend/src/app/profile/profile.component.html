@@ -1,0 +1,30 @@
+<app-dashboard></app-dashboard>
+
+<mat-card class="profile-card" *ngIf="!showGoals">
+  <mat-card-header>
+    <mat-card-title><h3>Profile Details</h3></mat-card-title>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div *ngIf="isLoading" class="loading">
+      <mat-spinner diameter="40"></mat-spinner>
+      <p>Loading profile...</p>
+    </div>
+
+    <div *ngIf="errorMessage" class="error">
+      {{ errorMessage }}
+    </div>
+
+    <div *ngIf="profile && !isLoading" class="profile-details">
+      <p><strong>Name:</strong> {{ profile.firstName }} {{ profile.lastName }}</p>
+      <p><strong>Username:</strong> {{ profile.userName }}</p>
+      <p><strong>Age:</strong> {{ profile.age }}</p>
+      <p><strong>Gender:</strong> {{ profile.gender }}</p>
+      <p><strong>Profile ID:</strong> {{ profile.profileId }}</p>
+    </div>
+  </mat-card-content>
+</mat-card>
+
+<div *ngIf="showGoals">
+  <app-goals></app-goals>
+</div>

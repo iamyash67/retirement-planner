@@ -1,0 +1,124 @@
+<app-dashboard></app-dashboard>
+<!-- Loading Spinner -->
+<mat-card *ngIf="isLoading" class="loading-card">
+  <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
+  <p>Loading goal data...</p>
+</mat-card>
+
+<!-- Goal Found: Show Goal Card + Action Buttons -->
+<mat-card *ngIf="!isLoading && goal" class="goal-card">
+  <mat-card-header>
+    <mat-card-title><h3>Your Goal</h3></mat-card-title>
+  </mat-card-header>
+
+  <p><strong>Current Age:</strong> <span class="normal-text"> {{ goal.currentAge }}</span></p>
+  <p><strong>Retirement Age:</strong> <span class="normal-text"> {{ goal.retirementAge }}</span></p>
+  <p><strong>Target Savings:</strong> <span class="normal-text"> {{ goal.targetSavings }}</span></p>
+  <p><strong>Current Savings:</strong> <span class="normal-text"> {{ goal.currentSavings }}</span></p>
+  <p *ngIf="goal.monthlyContribution !== undefined">
+    <strong>Monthly Contribution:</strong> <span class="normal-text"> {{ goal.monthlyContribution }}</span>
+  </p>
+
+  <!-- Action Buttons -->
+  <div style="margin-top: 16px;">
+    <button mat-raised-button color="primary" (click)="toggleSection('add')">
+      {{ selectedSection === 'add' ? 'Hide Add Investment' : 'Add Investment' }}
+    </button>
+
+    <button mat-raised-button color="accent" style="margin-left: 10px;" (click)="toggleSection('progress')">
+      {{ selectedSection === 'progress' ? 'Hide Progress' : 'Show Progress' }}
+    </button>
+  </div>
+</mat-card>
+
+<!-- Add Investment Form -->
+<mat-card *ngIf="selectedSection === 'add'" class="investment-card">
+  <h3>Add Monthly Investment</h3>
+
+  <form (ngSubmit)="onAddInvestment()" #investmentForm="ngForm">
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Year</mat-label>
+      <input matInput type="number" name="year" [(ngModel)]="addInvestmentData.year" required />
+    </mat-form-field>
+
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Month</mat-label>
+      <input matInput type="number" name="month" [(ngModel)]="addInvestmentData.month" required min="1" max="12" />
+    </mat-form-field>
+
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Monthly Investment</mat-label>
+      <input matInput type="number" name="monthlyInvestment" [(ngModel)]="addInvestmentData.monthlyInvestment" required min="1" />
+    </mat-form-field>
+
+    <button mat-raised-button color="accent" type="submit" [disabled]="investmentForm.invalid">
+      Submit
+    </button>
+  </form>
+
+  <p *ngIf="investmentSuccess" class="success-text">{{ investmentSuccess }}</p>
+  <p *ngIf="investmentError" class="error-text">{{ investmentError }}</p>
+</mat-card>
+
+<!-- Show Progress -->
+<mat-card *ngIf="selectedSection === 'progress'" class="investment-card">
+  <h3>Goal Progress</h3>
+
+  <div *ngIf="progressLoading">
+    <mat-progress-spinner mode="indeterminate" diameter="30"></mat-progress-spinner>
+    <p>Loading progress...</p>
+  </div>
+
+  <div *ngIf="!progressLoading && progressPercentage && !progressError">
+    <mat-progress-bar
+      mode="determinate"
+      [value]="parseProgressValue(progressPercentage)"
+      color="primary">
+    </mat-progress-bar>
+    <p><strong>Progress:</strong> {{ progressPercentage }}</p>
+  </div>
+
+  <div *ngIf="!progressLoading && progressError">
+    <p class="error-text">{{ progressError }}</p>
+  </div>
+</mat-card>
+
+<!-- No Goal Found: Create Goal Form -->
+<mat-card *ngIf="!isLoading && errorMessage && !goal">
+  <p class="error-text">{{ errorMessage }}</p>
+  <h3>Create a Goal</h3>
+
+  <form (ngSubmit)="onSubmit()" #goalForm="ngForm">
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Current Age</mat-label>
+      <input matInput type="number" name="currentAge" [(ngModel)]="newGoal.currentAge" required />
+    </mat-form-field>
+
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Retirement Age</mat-label>
+      <input matInput type="number" name="retirementAge" [(ngModel)]="newGoal.retirementAge" required />
+    </mat-form-field>
+
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Target Savings</mat-label>
+      <input matInput type="number" name="targetSavings" [(ngModel)]="newGoal.targetSavings" required />
+    </mat-form-field>
+
+    <mat-form-field appearance="fill" class="full-width">
+      <mat-label>Current Savings</mat-label>
+      <input matInput type="number" name="currentSavings" [(ngModel)]="newGoal.currentSavings" required />
+    </mat-form-field>
+
+    <mat-form-field appearance="fill" class="full-width">
+    <mat-label>Monthly Contribution</mat-label>
+    <input matInput type="number" [value]="''" disabled />
+    </mat-form-field>
+
+    <button mat-raised-button color="primary" type="submit" [disabled]="goalForm.invalid">
+      Create Goal
+    </button>
+  </form>
+
+  <p *ngIf="createSuccess" class="success-text">{{ createSuccess }}</p>
+  <p *ngIf="createError" class="error-text">{{ createError }}</p>
+</mat-card>
