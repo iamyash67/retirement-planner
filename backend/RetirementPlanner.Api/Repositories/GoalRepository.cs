@@ -7,17 +7,14 @@ namespace RetirementPlanner.Repositories
 {
     public class GoalRepository : IGoalRepository
     {
-        // Maps the Goals table onto the API's Goal shape. CurrentSavings is the savings entered at
-        // creation plus all recorded contributions, so the total can never drift from the contributions.
+        // CurrentSavings is the savings entered at creation plus all recorded contributions,
+        // so the total can never drift from the contributions.
         private const string SelectGoal = """
-            SELECT g.Id                         AS GoalId,
-                   g.UserId                     AS ProfileId,
-                   g.CurrentAge,
-                   g.RetirementAge,
-                   g.TargetAmount               AS TargetSavings,
-                   g.PlannedMonthlyContribution AS MonthlyContribution,
+            SELECT g.Id, g.UserId, g.Name, g.CurrentAge, g.RetirementAge, g.TargetAmount,
                    g.CurrentSavings + COALESCE(
-                       (SELECT SUM(c.Amount) FROM Contributions c WHERE c.GoalId = g.Id), 0) AS CurrentSavings
+                       (SELECT SUM(c.Amount) FROM Contributions c WHERE c.GoalId = g.Id), 0) AS CurrentSavings,
+                   g.ExpectedAnnualReturn, g.ReturnVolatility, g.InflationRate,
+                   g.AnnualContributionIncrease, g.PlannedMonthlyContribution, g.CreatedAt
             FROM Goals g
             """;
 

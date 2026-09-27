@@ -3,6 +3,7 @@ import { isPlatformBrowser, CommonModule } from '@angular/common';
 import { FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../services/auth.service';
+import { FieldErrors, parseApiError, splitFieldErrors } from '../services/api-errors';
 
 // Angular Material Modules
 import { MatIconModule } from '@angular/material/icon';
@@ -35,6 +36,7 @@ export class LoginComponent implements OnInit {
   });
 
   errorMessage = '';
+  fieldErrors: FieldErrors = {};
   isLoading = false;
   isBrowser: boolean;
 
@@ -54,6 +56,7 @@ export class LoginComponent implements OnInit {
 
     this.isLoading = true;
     this.errorMessage = '';
+    this.fieldErrors = {};
 
     const UserName = this.loginForm.get('username')?.value ?? '';
     const Password = this.loginForm.get('password')?.value ?? '';
@@ -81,7 +84,13 @@ export class LoginComponent implements OnInit {
         if (err.status === 401) {
           this.errorMessage = 'Invalid username or password.';
         } else {
-          this.errorMessage = err.error?.message || `Login failed. Please try again later.`;
+          // The API names the fields userName and password.
+          const { fieldErrors, message } = splitFieldErrors(
+            parseApiError(err, 'Login failed. Please try again later.'),
+            ['userName', 'password']
+          );
+          this.fieldErrors = fieldErrors;
+          this.errorMessage = message;
         }
         console.error('Login error:', err);
       }

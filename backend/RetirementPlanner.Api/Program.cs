@@ -24,8 +24,15 @@ builder.Services.AddRetirementPlanner(connectionString);
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
-// Swagger & Controllers
-builder.Services.AddControllers();
+// Controllers: every request DTO is validated by FluentValidation before the action runs.
+// Implicit [Required] for non-nullable strings is off, so FluentValidation owns all request rules.
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<FluentValidationFilter>();
+    options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
+});
+
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -51,3 +58,6 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+// Lets the integration tests host the API with WebApplicationFactory<Program>.
+public partial class Program;

@@ -1,17 +1,22 @@
 namespace RetirementPlanner.Models
 {
     /// <summary>
-    /// The goal returned by the API. ProfileId is the owning user's id, and CurrentSavings is the
-    /// savings entered at creation plus every recorded contribution.
+    /// A retirement goal. CurrentSavings is the savings entered at creation plus every recorded contribution.
     /// </summary>
     public class Goal
     {
-        public int ProfileId { get; set; }
-        public int GoalId { get; set; }
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string Name { get; set; } = string.Empty;
         public int CurrentAge { get; set; }
         public int RetirementAge { get; set; }
-        public decimal TargetSavings { get; set; }
-        public decimal MonthlyContribution { get; set; }
+        public decimal TargetAmount { get; set; }
         public decimal CurrentSavings { get; set; }
+        public decimal ExpectedAnnualReturn { get; set; }
+        public decimal ReturnVolatility { get; set; }
+        public decimal InflationRate { get; set; }
+        public decimal AnnualContributionIncrease { get; set; }
+        public decimal PlannedMonthlyContribution { get; set; }
+        public DateTime CreatedAt { get; set; }
     }
 }

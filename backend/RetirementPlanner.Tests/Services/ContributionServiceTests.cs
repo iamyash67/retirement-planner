@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using MySqlConnector;
 using RetirementPlanner.Data.Interfaces;
-using RetirementPlanner.DTO;
 using RetirementPlanner.Models;
 using RetirementPlanner.Repositories.Interfaces;
 using RetirementPlanner.Services;
@@ -16,12 +15,12 @@ namespace RetirementPlanner.Tests.Services
         private readonly Mock<IGoalRepository> _goalRepo = new();
         private readonly Mock<IContributionRepository> _contributionRepo = new();
 
-        private static readonly FinancialDTO Request = new() { GoalId = 4, Year = 2026, Month = 9, MonthlyInvestment = 500m };
+        private static readonly RecordContributionCommand Request = new(GoalId: 4, Year: 2026, Month: 9, Amount: 500m);
 
         public ContributionServiceTests()
         {
             _goalRepo.Setup(r => r.GetByIdForUpdateAsync(4, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Goal { GoalId = 4, TargetSavings = 10_000m, CurrentSavings = 1_000m });
+                .ReturnsAsync(new Goal { Id = 4, TargetAmount = 10_000m, CurrentSavings = 1_000m });
         }
 
         private ContributionService CreateService() =>
@@ -30,7 +29,7 @@ namespace RetirementPlanner.Tests.Services
         [Fact]
         public async Task RecordAsync_WithNewMonth_CreatesContributionAndReturnsUpdatedGoal()
         {
-            var updated = new Goal { GoalId = 4, TargetSavings = 10_000m, CurrentSavings = 1_500m };
+            var updated = new Goal { Id = 4, TargetAmount = 10_000m, CurrentSavings = 1_500m };
             _goalRepo.Setup(r => r.GetByIdAsync(4, It.IsAny<CancellationToken>())).ReturnsAsync(updated);
 
             var result = await CreateService().RecordAsync(Request);
@@ -58,7 +57,7 @@ namespace RetirementPlanner.Tests.Services
         public async Task RecordAsync_WhenAmountExceedsTarget_ReturnsExceedsTarget()
         {
             var result = await CreateService().RecordAsync(
-                new FinancialDTO { GoalId = 4, Year = 2026, Month = 9, MonthlyInvestment = 10_000.01m });
+                new RecordContributionCommand(GoalId: 4, Year: 2026, Month: 9, Amount: 10_000.01m));
 
             Assert.Equal(ContributionStatus.ExceedsTarget, result.Status);
             VerifyNothingCreated();

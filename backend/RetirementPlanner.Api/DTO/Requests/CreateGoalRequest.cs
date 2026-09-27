@@ -1,6 +1,6 @@
-namespace RetirementPlanner.DTO
+namespace RetirementPlanner.DTO.Requests
 {
-    public class GoalDTO
+    public class CreateGoalRequest
     {
         public int ProfileId { get; set; }
         public int CurrentAge { get; set; }
@@ -8,7 +8,7 @@ namespace RetirementPlanner.DTO
         public decimal TargetSavings { get; set; }
         public decimal CurrentSavings { get; set; }
 
-        // Optional; GoalService fills in defaults when these are omitted.
+        // Optional simulation inputs; defaults are used when omitted. Rates are fractions (0.06 = 6 %).
         public string? Name { get; set; }
         public decimal? ExpectedAnnualReturn { get; set; }
         public decimal? ReturnVolatility { get; set; }

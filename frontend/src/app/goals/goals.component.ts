@@ -12,6 +12,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { ActivatedRoute } from '@angular/router';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { DashboardComponent } from '../dashboard/dashboard.component';
+import { FieldErrors, parseApiError, splitFieldErrors } from '../services/api-errors';
 @Component({
   standalone: true,
   selector: 'app-goals',
@@ -49,6 +50,7 @@ export class GoalsComponent implements OnInit {
 
   createSuccess = '';
   createError = '';
+  createFieldErrors: FieldErrors = {};
 
   addInvestmentData = {
     year: new Date().getFullYear(),
@@ -58,6 +60,7 @@ export class GoalsComponent implements OnInit {
 
   investmentSuccess = '';
   investmentError = '';
+  investmentFieldErrors: FieldErrors = {};
 
   constructor(
     private goalService: GoalsService,
@@ -108,6 +111,7 @@ export class GoalsComponent implements OnInit {
     // Reset messages whenever section toggled
     this.investmentSuccess = '';
     this.investmentError = '';
+    this.investmentFieldErrors = {};
     this.progressError = '';
     this.progressPercentage = '';
 
@@ -128,6 +132,7 @@ export class GoalsComponent implements OnInit {
 
   onSubmit(): void {
     const profile = this.authService.getProfile();
+    this.createFieldErrors = {};
     if (!profile) {
       this.createError = 'Profile not found.';
       this.createSuccess = '';
@@ -143,14 +148,21 @@ export class GoalsComponent implements OnInit {
     };
 
     this.goalService.createGoal(goalPayload).subscribe({
-      next: (message) => {
-        this.createSuccess = message;
+      next: (goal) => {
+        this.createSuccess = 'Goal created successfully';
         this.createError = '';
-        this.fetchGoal();
+        this.goal = goal;
+        this.goalService.setGoal(goal); // cache the goal the API returned
+        this.errorMessage = '';
         this.selectedSection = 'none'; // hide any open sections on create
       },
       error: (err) => {
-        this.createError = err.error || 'Failed to create goal.';
+        const { fieldErrors, message } = splitFieldErrors(
+          parseApiError(err, 'Failed to create goal.'),
+          ['currentAge', 'retirementAge', 'targetSavings', 'currentSavings']
+        );
+        this.createFieldErrors = fieldErrors;
+        this.createError = message;
         this.createSuccess = '';
       },
     });
@@ -158,6 +170,7 @@ export class GoalsComponent implements OnInit {
 
   onAddInvestment(): void {
     if (!this.goal) return;
+    this.investmentFieldErrors = {};
 
     const payload = {
       goalId: this.goal.goalId,
@@ -177,8 +190,13 @@ export class GoalsComponent implements OnInit {
         }, 3000);
       },
       error: (err) => {
+        const { fieldErrors, message } = splitFieldErrors(
+          parseApiError(err, 'Failed to record investment.'),
+          ['year', 'month', 'monthlyInvestment']
+        );
         this.investmentSuccess = '';
-        this.investmentError = err.error || 'Failed to record investment.';
+        this.investmentFieldErrors = fieldErrors;
+        this.investmentError = message;
       },
     });
   }

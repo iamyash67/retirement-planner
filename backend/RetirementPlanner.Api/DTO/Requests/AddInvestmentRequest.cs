@@ -1,6 +1,6 @@
-namespace RetirementPlanner.DTO
+namespace RetirementPlanner.DTO.Requests
 {
-    public class FinancialDTO
+    public class AddInvestmentRequest
     {
         public int GoalId { get; set; }
         public int Year { get; set; }

@@ -47,7 +47,7 @@ Run this after `docker compose down -v && docker compose up -d` and `dotnet run 
 which seeds the demo user in Development:
 
 1. POST `/api/user/login` with `demo@example.com` / `demo123` returns 200 and the profile.
-2. POST `/api/goal` creates a goal for the demo user.
+2. POST `/api/goal` creates a goal for the demo user (201 with the goal).
 3. GET `/api/goal/{profileId}` returns that goal.
 4. POST `/api/financial/Add-Investment` for the current month returns 200 with CurrentSavings increased.
 5. GET `/api/financial/progress/{goalId}` returns the percentage.
@@ -69,6 +69,11 @@ curl -s -w ' [%{http_code}]\n' -X POST $B/financial/Add-Investment -H 'Content-T
 - Keep the layered structure: Controllers → Services → Repositories, with `DTO/` and `Models/`.
   Services and repositories have interfaces (`Services/Interfaces`, `Repositories/Interfaces`)
   registered in `Program.cs`. Follow SOLID.
+- Every endpoint has its own request and response DTO (`DTO/Requests`, `DTO/Responses`). Responses never
+  expose domain models or credentials; map explicitly with the extension methods in `Mapping/`, no AutoMapper.
+- Every request DTO has a FluentValidation validator in `Validators/`. Validation failures are 400
+  ValidationProblemDetails with per-field errors; 404 and 409 stay plain strings. Controllers only translate
+  HTTP to service calls and results to status codes.
 - Schema changes go in a new `Migrations/VNNN__description.sql`; never edit a migration that has run on a shared database.
   Only `IDbConnectionFactory` may create database connections; repositories use the scoped `IUnitOfWork`.
 - Never commit secrets. `.env` and user-secrets stay local; only `.env.example` with placeholders is committed.

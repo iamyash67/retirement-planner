@@ -14,6 +14,7 @@
         <mat-label>Username</mat-label>
         <mat-icon matPrefix>person</mat-icon>
         <input matInput formControlName="username" required name="custom-username" autocomplete="off">
+        <mat-hint *ngIf="fieldErrors['userName'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
       </mat-form-field>
 
       <!-- Password Field with Icon -->
@@ -21,6 +22,7 @@
         <mat-label>Password</mat-label>
         <mat-icon matPrefix>lock</mat-icon>
         <input matInput type="password" formControlName="password" required name="custom-password" autocomplete="off">
+        <mat-hint *ngIf="fieldErrors['password'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
       </mat-form-field>
 
       <!-- Error Message -->

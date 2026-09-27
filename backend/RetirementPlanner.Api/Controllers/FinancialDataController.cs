@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
-using RetirementPlanner.DTO;
+using RetirementPlanner.DTO.Requests;
+using RetirementPlanner.DTO.Responses;
+using RetirementPlanner.Infrastructure;
+using RetirementPlanner.Mapping;
 using RetirementPlanner.Models;
 using RetirementPlanner.Services.Interfaces;
 
@@ -19,49 +22,40 @@ namespace RetirementPlanner.Controllers
         }
 
         [HttpPost("Add-Investment")]
-        public async Task<IActionResult> RecordMonthlyInvestment([FromBody] FinancialDTO request, CancellationToken cancellationToken)
+        [ProducesResponseType<GoalResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<string>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<string>(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> RecordMonthlyInvestment(AddInvestmentRequest request, CancellationToken cancellationToken)
         {
-            if (request == null)
-                return BadRequest("Request body cannot be empty");
-
-            if (request.GoalId <= 0)
-                return BadRequest("Invalid Goal ID");
-
-            if (request.Year < 1980 || request.Year > DateTime.Now.Year)
-                return BadRequest("Invalid Year");
-
-            if (request.Month < 1 || request.Month > 12)
-                return BadRequest("Month must be between 1-12");
-
-            if (request.MonthlyInvestment <= 0)
-                return BadRequest("Monthly investment must be positive");
-
-            var result = await _contributionService.RecordAsync(request, cancellationToken);
-            return result.Status switch
+            var result = await _contributionService.RecordAsync(request.ToCommand(), cancellationToken);
+            switch (result.Status)
             {
-                ContributionStatus.Recorded => Ok(result.Goal),
-                ContributionStatus.GoalNotFound => NotFound("Goal not found"),
-                ContributionStatus.ExceedsTarget => BadRequest("Monthly investment cannot exceed target savings"),
-                ContributionStatus.AlreadyRecorded => Conflict("Investment already recorded"),
-                var status => throw new InvalidOperationException($"Unhandled contribution status {status}.")
-            };
+                case ContributionStatus.Recorded:
+                    return Ok(result.Goal!.ToResponse());
+                case ContributionStatus.GoalNotFound:
+                    return NotFound("Goal not found");
+                case ContributionStatus.AlreadyRecorded:
+                    return Conflict("Investment already recorded");
+                case ContributionStatus.ExceedsTarget:
+                    // A rule that needs the goal, so the service checks it; reported like any other field error.
+                    return FieldErrorResults.ValidationProblem(HttpContext,
+                        [(nameof(AddInvestmentRequest.MonthlyInvestment), "Monthly investment cannot exceed target savings")]);
+                default:
+                    throw new InvalidOperationException($"Unhandled contribution status {result.Status}.");
+            }
         }
 
         [HttpGet("progress/{goalId}")]
-        public async Task<IActionResult> GetProgressByGoalId(int goalId, CancellationToken cancellationToken)
+        [ProducesResponseType<ProgressResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<string>(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetProgressByGoalId([FromRoute] GetProgressRequest request, CancellationToken cancellationToken)
         {
-            if (goalId <= 0)
-                return BadRequest("Invalid Goal ID");
-
-            var progress = await _goalService.GetProgressAsync(goalId, cancellationToken);
-            if (progress == null)
-                return NotFound("Goal not found or TargetSavings is zero");
-
-            return Ok(new
-            {
-                GoalId = goalId,
-                Progress = $"{Math.Round(progress.Value, 2)}%"
-            });
+            var progress = await _goalService.GetProgressAsync(request.GoalId, cancellationToken);
+            return progress == null
+                ? NotFound("Goal not found or TargetSavings is zero")
+                : Ok(progress.Value.ToProgressResponse(request.GoalId));
         }
     }
 }

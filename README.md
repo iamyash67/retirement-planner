@@ -18,19 +18,26 @@ The API is split into layers, each with one responsibility:
 
 | Layer | Folder | Responsibility |
 |---|---|---|
-| Controllers | `Controllers/` | HTTP endpoints, request validation, status codes |
+| Controllers | `Controllers/` | Translate HTTP to service calls and results to status codes; no business logic |
+| Validators | `Validators/` | One FluentValidation validator per request DTO, run before every action |
+| Mapping | `Mapping/` | Explicit extension methods between DTOs and domain models |
 | Services | `Services/` | Business logic; coordinates repositories |
 | Repositories | `Repositories/` | Data access with Dapper and parameterised SQL |
 | Data | `Data/` | Connection factory, unit of work, migrator and development seeder |
-| DTOs | `DTO/` | Request shapes accepted by the API |
-| Models | `Models/` | Domain entities returned by services and repositories |
+| DTOs | `DTO/Requests`, `DTO/Responses` | The API contract: one request and one response type per endpoint |
+| Models | `Models/` | Domain entities and commands used by services and repositories; never returned by the API |
 
 Services and repositories are defined by interfaces (`Services/Interfaces`, `Repositories/Interfaces`)
 and registered with dependency injection in `Program.cs`, so each layer depends on abstractions
 rather than concrete classes.
 
 All repositories in a request share one connection and, when a service needs it, one transaction,
-through a scoped `IUnitOfWork`. Only `IDbConnectionFactory` creates connections. Unhandled exceptions
+through a scoped `IUnitOfWork`.
+
+Every request DTO has a FluentValidation validator. A global action filter runs it before the action,
+and failures return **400 ValidationProblemDetails** with one entry per field, keyed by the JSON field
+name (`errors.retirementAge`). The Angular forms show these messages under the matching inputs.
+Not-found (404), conflict (409) and bad-login (401) responses stay plain strings. Only `IDbConnectionFactory` creates connections. Unhandled exceptions
 are returned as RFC 7807 ProblemDetails by a global exception handler. See
 [docs/database.md](docs/database.md) for the schema, an ER diagram and the design decisions.
 
@@ -58,7 +65,9 @@ backend/
     Data/                       Connection factory, unit of work, migrator, dev seeder (+ Interfaces/)
     Migrations/                 Versioned SQL migrations (V001__..., embedded, run on startup)
     Infrastructure/             Global exception handler (ProblemDetails)
-    DTO/                        Request models
+    Validators/                 FluentValidation validators, one per request DTO
+    Mapping/                    DTO <-> domain mapping extension methods
+    DTO/                        Requests/ and Responses/ (the API contract)
     Models/                     Domain models
     Program.cs                  DI registration, migrations, CORS, Swagger
   RetirementPlanner.Tests/
@@ -130,6 +139,6 @@ dotnet test    # unit tests, plus integration tests that start MySQL with Testco
 |---|---|---|
 | POST | `/api/user/login` | Validate email and password, return profile |
 | GET | `/api/goal/{profileId}` | Get the profile's goal |
-| POST | `/api/goal` | Create a goal (one per profile) |
+| POST | `/api/goal` | Create a goal (one per profile); 201 with the goal |
 | POST | `/api/financial/Add-Investment` | Record a month's investment (409 if already recorded) |
 | GET | `/api/financial/progress/{goalId}` | Percentage of target saved |

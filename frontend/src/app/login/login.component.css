@@ -57,6 +57,11 @@ mat-form-field {
 }
 
 /* Error Message */
+/* Server-side validation message shown under the matching input */
+.field-error {
+  color: #ba1a1a;
+}
+
 .error-message {
   color: #d32f2f;
   background-color: #ffebee;
