@@ -27,6 +27,19 @@ namespace RetirementPlanner.Repositories
                 new CommandDefinition(sql, new { Email = email }, _unitOfWork.Transaction, cancellationToken: cancellationToken));
         }
 
+        public async Task<User?> GetByIdAsync(int userId, CancellationToken cancellationToken = default)
+        {
+            const string sql = """
+                SELECT Id, Email, PasswordHash, CreatedAt
+                FROM Users
+                WHERE Id = @UserId
+                """;
+
+            var connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
+            return await connection.QuerySingleOrDefaultAsync<User>(
+                new CommandDefinition(sql, new { UserId = userId }, _unitOfWork.Transaction, cancellationToken: cancellationToken));
+        }
+
         public async Task<int> CreateAsync(string email, string passwordHash, CancellationToken cancellationToken = default)
         {
             const string sql = """

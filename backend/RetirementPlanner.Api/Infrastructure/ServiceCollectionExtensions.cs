@@ -31,6 +31,7 @@ namespace RetirementPlanner.Infrastructure
             services.AddScoped<IProfileRepository, ProfileRepository>();
             services.AddScoped<IGoalRepository, GoalRepository>();
             services.AddScoped<IContributionRepository, ContributionRepository>();
+            services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 
             // Services
             services.AddSingleton(TimeProvider.System);
@@ -38,6 +39,7 @@ namespace RetirementPlanner.Infrastructure
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IGoalService, GoalService>();
             services.AddScoped<IContributionService, ContributionService>();
+            services.AddScoped<IAuthService, AuthService>();
 
             // Request validators (one per request DTO), run by FluentValidationFilter
             services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>(ServiceLifetime.Singleton);

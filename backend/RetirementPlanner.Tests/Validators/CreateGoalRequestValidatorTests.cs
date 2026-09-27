@@ -10,7 +10,6 @@ namespace RetirementPlanner.Tests.Validators
 
         private static CreateGoalRequest Valid() => new()
         {
-            ProfileId = 1,
             CurrentAge = 30,
             RetirementAge = 60,
             TargetSavings = 1_000_000m,
@@ -36,18 +35,6 @@ namespace RetirementPlanner.Tests.Validators
             request.RetirementAge = CreateGoalRequestValidator.MaxAge;
 
             _validator.TestValidate(request).ShouldNotHaveAnyValidationErrors();
-        }
-
-        [Theory]
-        [InlineData(0)]
-        [InlineData(-1)]
-        public void NonPositiveProfileId_Fails(int profileId)
-        {
-            var request = Valid();
-            request.ProfileId = profileId;
-
-            _validator.TestValidate(request)
-                .ShouldHaveValidationErrorFor(r => r.ProfileId).WithErrorMessage("Invalid Profile ID").Only();
         }
 
         [Fact]

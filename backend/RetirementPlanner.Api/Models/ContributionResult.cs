@@ -8,6 +8,6 @@ namespace RetirementPlanner.Models
         AlreadyRecorded
     }
 
-    /// <summary>The outcome of recording a contribution. Goal is the updated goal when Status is Recorded.</summary>
-    public record ContributionResult(ContributionStatus Status, Goal? Goal = null);
+    /// <summary>The outcome of recording a contribution. Contribution is set when Status is Recorded.</summary>
+    public record ContributionResult(ContributionStatus Status, Contribution? Contribution = null);
 }

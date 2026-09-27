@@ -14,6 +14,7 @@ namespace RetirementPlanner.Tests.Integration
         [InlineData("Goals")]
         [InlineData("Contributions")]
         [InlineData("SimulationRuns")]
+        [InlineData("RefreshTokens")]
         public async Task Migrations_CreateTable(string table)
         {
             var count = await db.ScalarAsync<long>(
@@ -29,7 +30,7 @@ namespace RetirementPlanner.Tests.Integration
             db.CreateMigrator().Migrate();
 
             var applied = await db.ScalarAsync<long>("SELECT COUNT(*) FROM schemaversions");
-            Assert.Equal(4, applied);
+            Assert.Equal(5, applied);
         }
 
         [Fact]

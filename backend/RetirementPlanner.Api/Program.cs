@@ -1,3 +1,4 @@
+using RetirementPlanner.Auth;
 using RetirementPlanner.Data.Interfaces;
 using RetirementPlanner.Infrastructure;
 
@@ -6,19 +7,27 @@ var builder = WebApplication.CreateBuilder(args);
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
 
+// Throws here, before anything else starts, if Jwt:SigningKey is missing or too short.
+var jwtOptions = JwtOptions.Load(builder.Configuration);
+
 // CORS for the Angular dev server
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
+        // Credentials are allowed so the browser sends the refresh-token cookie to /api/auth.
         policy.WithOrigins("http://localhost:4200")
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
 // Data access, repositories and services
 builder.Services.AddRetirementPlanner(connectionString);
+
+// JWT authentication (required on every endpoint unless [AllowAnonymous]) and the auth rate limit
+builder.Services.AddJwtAuth(jwtOptions, builder.Configuration);
 
 // Unhandled exceptions become RFC 7807 ProblemDetails
 builder.Services.AddProblemDetails();
@@ -54,7 +63,9 @@ if (app.Environment.IsDevelopment())
 // CORS runs first so its headers are also added to error responses from the exception handler.
 app.UseCors("AllowFrontend");
 app.UseExceptionHandler();
+app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 app.MapControllers();
 
 app.Run();

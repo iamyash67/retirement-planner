@@ -12,6 +12,7 @@ erDiagram
     Users ||--o{ Goals : "owns"
     Goals ||--o{ Contributions : "receives"
     Goals ||--o{ SimulationRuns : "is simulated by"
+    Users ||--o{ RefreshTokens : "signs in with"
 
     Users {
         int Id PK
@@ -49,6 +50,16 @@ erDiagram
         decimal Amount
         datetime RecordedAt
     }
+    RefreshTokens {
+        int Id PK
+        int UserId FK
+        char FamilyId "one per login"
+        char TokenHash UK "SHA-256"
+        datetime CreatedAt
+        datetime ExpiresAt
+        datetime RevokedAt "nullable"
+        int ReplacedByTokenId "nullable"
+    }
     SimulationRuns {
         int Id PK
         int GoalId FK
@@ -67,9 +78,10 @@ erDiagram
 | `V002__create_goals.sql` | `Goals` |
 | `V003__create_contributions.sql` | `Contributions` |
 | `V004__create_simulation_runs.sql` | `SimulationRuns` |
+| `V005__create_refresh_tokens.sql` | `RefreshTokens` |
 
 - Scripts run in name order, and each one runs once. DbUp records applied scripts in the `schemaversions` table.
-- To change the schema, add a new `V005__description.sql`. Never edit a script that has already run on a shared database.
+- To change the schema, add a new `V006__description.sql`. Never edit a script that has already run on a shared database.
 - If a script fails, the API refuses to start.
 - The Docker init script (`docker/mysql-init/01_create_database.sql`) only creates the empty database.
 
@@ -124,6 +136,16 @@ Nothing is left orphaned, and account deletion is a single statement.
 
 **Named constraints.** Every primary key, foreign key, unique key and check has an explicit name (`PK_`, `FK_`,
 `UQ_`, `CK_`, `IX_`), so errors and later migrations can refer to them reliably.
+
+**Refresh tokens are stored hashed, rotated, and grouped into families.** A refresh token is a 256-bit
+random value sent to the browser in an httpOnly cookie. Only its SHA-256 hash is stored (a fast hash is
+enough for a random, high-entropy value), so a copy of the table can't be used to sign in. Every refresh
+revokes the presented token, records its replacement in `ReplacedByTokenId`, and issues a new token with
+the same `FamilyId`. A family is one login session. If a token that was already revoked is presented again,
+someone is replaying an old token, so the whole family is revoked and that session has to sign in again.
+Other sessions of the same user are not affected. The row lock taken on refresh means two concurrent
+refreshes with the same token can't both succeed. `ReplacedByTokenId` is deliberately not a foreign key,
+because rows only ever go away together with their user.
 
 **Demo data is seeded in code, not in a migration.** Migrations run in every environment, and demo credentials
 must not. `DevelopmentDataSeeder` runs only in the Development environment. It is idempotent and creates

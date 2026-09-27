@@ -5,29 +5,17 @@ using RetirementPlanner.Validators;
 
 namespace RetirementPlanner.Tests.Validators
 {
-    public class AddInvestmentRequestValidatorTests
+    public class AddContributionRequestValidatorTests
     {
         private static readonly DateTimeOffset Now = new(2026, 9, 27, 12, 0, 0, TimeSpan.Zero);
-        private readonly AddInvestmentRequestValidator _validator = new(new FixedTimeProvider(Now));
+        private readonly AddContributionRequestValidator _validator = new(new FixedTimeProvider(Now));
 
-        private static AddInvestmentRequest Valid() => new() { GoalId = 1, Year = 2026, Month = 9, MonthlyInvestment = 500m };
+        private static AddContributionRequest Valid() => new() { Year = 2026, Month = 9, Amount = 500m };
 
         [Fact]
         public void ValidRequest_Passes()
         {
             _validator.TestValidate(Valid()).ShouldNotHaveAnyValidationErrors();
-        }
-
-        [Theory]
-        [InlineData(0)]
-        [InlineData(-3)]
-        public void NonPositiveGoalId_Fails(int goalId)
-        {
-            var request = Valid();
-            request.GoalId = goalId;
-
-            _validator.TestValidate(request)
-                .ShouldHaveValidationErrorFor(r => r.GoalId).WithErrorMessage("Invalid Goal ID").Only();
         }
 
         [Theory]
@@ -59,7 +47,7 @@ namespace RetirementPlanner.Tests.Validators
             var request = Valid();
             request.Year = 2031;
 
-            new AddInvestmentRequestValidator(new FixedTimeProvider(new DateTimeOffset(2031, 1, 1, 12, 0, 0, TimeSpan.Zero)))
+            new AddContributionRequestValidator(new FixedTimeProvider(new DateTimeOffset(2031, 1, 1, 12, 0, 0, TimeSpan.Zero)))
                 .TestValidate(request)
                 .ShouldNotHaveValidationErrorFor(r => r.Year);
         }
@@ -79,14 +67,13 @@ namespace RetirementPlanner.Tests.Validators
         [Theory]
         [InlineData(0)]
         [InlineData(-10)]
-        public void NonPositiveMonthlyInvestment_Fails(decimal amount)
+        public void NonPositiveAmount_Fails(decimal amount)
         {
             var request = Valid();
-            request.MonthlyInvestment = amount;
+            request.Amount = amount;
 
             _validator.TestValidate(request)
-                .ShouldHaveValidationErrorFor(r => r.MonthlyInvestment)
-                .WithErrorMessage("Monthly investment must be positive").Only();
+                .ShouldHaveValidationErrorFor(r => r.Amount).WithErrorMessage("Amount must be positive").Only();
         }
     }
 }

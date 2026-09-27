@@ -1,7 +1,7 @@
-import { Component, OnInit, Inject, PLATFORM_ID } from '@angular/core';
-import { isPlatformBrowser, CommonModule } from '@angular/common';
+import { Component } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { FormGroup, FormControl, Validators, ReactiveFormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { FieldErrors, parseApiError, splitFieldErrors } from '../services/api-errors';
 
@@ -21,6 +21,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    RouterLink,
     MatCardModule,
     MatFormFieldModule,
     MatInputModule,
@@ -29,27 +30,17 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
     MatProgressSpinnerModule
   ]
 })
-export class LoginComponent implements OnInit {
+export class LoginComponent {
   loginForm = new FormGroup({
-    username: new FormControl('', Validators.required),
+    email: new FormControl('', [Validators.required, Validators.email]),
     password: new FormControl('', Validators.required)
   });
 
   errorMessage = '';
   fieldErrors: FieldErrors = {};
   isLoading = false;
-  isBrowser: boolean;
 
-  constructor(
-    private authService: AuthService,
-    private router: Router,
-    @Inject(PLATFORM_ID) private platformId: Object
-  ) {
-    this.isBrowser = isPlatformBrowser(platformId);
-  }
-
-  ngOnInit(): void {
-  }
+  constructor(private authService: AuthService, private router: Router) {}
 
   onSubmit() {
     if (this.loginForm.invalid) return;
@@ -58,50 +49,29 @@ export class LoginComponent implements OnInit {
     this.errorMessage = '';
     this.fieldErrors = {};
 
-    const UserName = this.loginForm.get('username')?.value ?? '';
-    const Password = this.loginForm.get('password')?.value ?? '';
+    const email = this.loginForm.value.email ?? '';
+    const password = this.loginForm.value.password ?? '';
 
-    this.authService.login({ UserName, Password }).subscribe({
-      next: (profile) => {
+    this.authService.login(email, password).subscribe({
+      next: () => {
         this.isLoading = false;
-
-        this.authService.setCurrentUser(profile);
-        localStorage.setItem('currentUser', JSON.stringify(profile));
-
-        const profileId = profile.profileId;
-
-        if (profileId) {
-          this.router.navigate(['/dashboard/profile'], {
-            queryParams: { profileId },
-            replaceUrl: true, // Prevent back to login
-          });
-        } else {
-          this.errorMessage = 'Login successful but profile ID is missing.';
-        }
+        this.router.navigate(['/dashboard/goals'], { replaceUrl: true }); // prevent going back to login
       },
       error: (err) => {
         this.isLoading = false;
         if (err.status === 401) {
-          this.errorMessage = 'Invalid username or password.';
+          this.errorMessage = 'Invalid email or password.';
+        } else if (err.status === 429) {
+          this.errorMessage = 'Too many attempts. Please wait a minute and try again.';
         } else {
-          // The API names the fields userName and password.
           const { fieldErrors, message } = splitFieldErrors(
             parseApiError(err, 'Login failed. Please try again later.'),
-            ['userName', 'password']
+            ['email', 'password']
           );
           this.fieldErrors = fieldErrors;
           this.errorMessage = message;
         }
-        console.error('Login error:', err);
       }
     });
-  }
-
-  navigateToHome() {
-    this.router.navigate(['/']);
-  }
-
-  navigateToLogin() {
-    this.router.navigate(['/login']);
   }
 }

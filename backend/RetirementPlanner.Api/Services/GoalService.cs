@@ -31,11 +31,11 @@ namespace RetirementPlanner.Services
             _logger = logger;
         }
 
-        public Task<Goal?> GetGoalForUserAsync(int userId, CancellationToken cancellationToken = default) =>
-            _goalRepo.GetLatestByUserIdAsync(userId, cancellationToken);
+        public Task<IReadOnlyList<Goal>> ListGoalsAsync(int userId, CancellationToken cancellationToken = default) =>
+            _goalRepo.ListByUserIdAsync(userId, cancellationToken);
 
-        public Task<Goal?> GetGoalAsync(int goalId, CancellationToken cancellationToken = default) =>
-            _goalRepo.GetByIdAsync(goalId, cancellationToken);
+        public Task<Goal?> GetGoalAsync(int userId, int goalId, CancellationToken cancellationToken = default) =>
+            _goalRepo.GetForUserAsync(goalId, userId, cancellationToken);
 
         public Task<CreateGoalResult> CreateGoalAsync(CreateGoalCommand command, CancellationToken cancellationToken = default) =>
             _unitOfWork.ExecuteInTransactionAsync(async () =>
@@ -65,14 +65,14 @@ namespace RetirementPlanner.Services
 
                 _logger.LogInformation("Created goal {GoalId} for user {UserId}", goalId, command.UserId);
 
-                var goal = await _goalRepo.GetByIdAsync(goalId, cancellationToken)
+                var goal = await _goalRepo.GetForUserAsync(goalId, command.UserId, cancellationToken)
                     ?? throw new InvalidOperationException($"Goal {goalId} disappeared inside its own transaction.");
                 return new CreateGoalResult(GoalCreationStatus.Created, goal);
             }, cancellationToken);
 
-        public async Task<decimal?> GetProgressAsync(int goalId, CancellationToken cancellationToken = default)
+        public async Task<decimal?> GetProgressAsync(int userId, int goalId, CancellationToken cancellationToken = default)
         {
-            var goal = await _goalRepo.GetByIdAsync(goalId, cancellationToken);
+            var goal = await _goalRepo.GetForUserAsync(goalId, userId, cancellationToken);
             if (goal == null || goal.TargetAmount == 0)
                 return null;
 

@@ -1,4 +1,6 @@
 using System.Text.Json;
+using RetirementPlanner.Auth;
+using RetirementPlanner.DTO.Requests;
 using RetirementPlanner.Mapping;
 using RetirementPlanner.Models;
 
@@ -18,25 +20,49 @@ namespace RetirementPlanner.Tests.Mapping
         };
 
         [Fact]
-        public void AuthenticatedUser_ToLoginResponse_MapsEveryField()
+        public void AuthenticatedUser_ToResponse_MapsEveryField()
         {
-            var response = User.ToLoginResponse();
+            var response = User.ToResponse();
 
-            Assert.Equal(7, response.ProfileId);
+            Assert.Equal(7, response.Id);
+            Assert.Equal("jane@example.com", response.Email);
             Assert.Equal("Jane", response.FirstName);
             Assert.Equal("Doe", response.LastName);
             Assert.Equal(36, response.Age);
             Assert.Null(response.Gender);
-            Assert.Equal("jane@example.com", response.UserName);
         }
 
         [Fact]
-        public void LoginResponse_SerializesToTheShapeTheFrontendExpects()
+        public void AuthSession_ToResponse_OmitsTheRefreshToken()
         {
-            var json = JsonSerializer.Serialize(User.ToLoginResponse(), JsonSerializerOptions.Web);
-            var keys = JsonDocument.Parse(json).RootElement.EnumerateObject().Select(p => p.Name).ToArray();
+            var expiresAt = new DateTimeOffset(2026, 9, 27, 10, 15, 0, TimeSpan.Zero);
+            var session = new AuthSession(User, new AccessToken("access.jwt", expiresAt), "raw-refresh-token", expiresAt.AddDays(7));
 
-            Assert.Equal(["profileId", "firstName", "lastName", "age", "gender", "userName"], keys);
+            var response = session.ToResponse();
+            var json = JsonSerializer.Serialize(response, JsonSerializerOptions.Web);
+
+            Assert.Equal("access.jwt", response.AccessToken);
+            Assert.Equal(expiresAt, response.ExpiresAt);
+            Assert.Equal(7, response.User.Id);
+            Assert.DoesNotContain("raw-refresh-token", json);
+            Assert.Equal(["accessToken", "expiresAt", "user"],
+                JsonDocument.Parse(json).RootElement.EnumerateObject().Select(p => p.Name).ToArray());
+        }
+
+        [Fact]
+        public void RegisterRequest_ToCommand_TrimsAndNormalisesOptionalGender()
+        {
+            var command = new RegisterRequest
+            {
+                Email = " jane@example.com ",
+                Password = " keep spaces ",
+                FirstName = " Jane ",
+                LastName = " Doe ",
+                DateOfBirth = new DateOnly(1990, 6, 15),
+                Gender = "  "
+            }.ToCommand();
+
+            Assert.Equal(new RegisterCommand("jane@example.com", " keep spaces ", "Jane", "Doe", new DateOnly(1990, 6, 15), null), command);
         }
     }
 }

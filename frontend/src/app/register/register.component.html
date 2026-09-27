@@ -1,0 +1,63 @@
+<div class="dashboard-header">
+  <div class="dashboard-title">Retirement Planner</div>
+</div>
+
+<mat-card class="login-card">
+  <mat-card-header>
+    <mat-card-title>Create an account</mat-card-title>
+  </mat-card-header>
+  <mat-card-content>
+    <form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
+      <mat-form-field appearance="fill">
+        <mat-label>Email</mat-label>
+        <mat-icon matPrefix>mail</mat-icon>
+        <input matInput type="email" formControlName="email" required name="email" autocomplete="email">
+        <mat-hint *ngIf="fieldErrors['email'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill">
+        <mat-label>Password (at least 8 characters)</mat-label>
+        <mat-icon matPrefix>lock</mat-icon>
+        <input matInput type="password" formControlName="password" required name="password" autocomplete="new-password">
+        <mat-hint *ngIf="fieldErrors['password'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill">
+        <mat-label>First name</mat-label>
+        <input matInput formControlName="firstName" required name="firstName" autocomplete="given-name">
+        <mat-hint *ngIf="fieldErrors['firstName'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill">
+        <mat-label>Last name</mat-label>
+        <input matInput formControlName="lastName" required name="lastName" autocomplete="family-name">
+        <mat-hint *ngIf="fieldErrors['lastName'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill">
+        <mat-label>Date of birth</mat-label>
+        <input matInput type="date" formControlName="dateOfBirth" required name="dateOfBirth" autocomplete="bday">
+        <mat-hint *ngIf="fieldErrors['dateOfBirth'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
+      </mat-form-field>
+
+      <mat-form-field appearance="fill">
+        <mat-label>Gender (optional)</mat-label>
+        <input matInput formControlName="gender" name="gender" maxlength="30">
+        <mat-hint *ngIf="fieldErrors['gender'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
+      </mat-form-field>
+
+      <div *ngIf="errorMessage" class="error-message">
+        {{ errorMessage }}
+      </div>
+
+      <button mat-raised-button color="primary" type="submit" [disabled]="!registerForm.valid || isLoading">
+        <div class="button-content">
+          <span *ngIf="!isLoading">Create account</span>
+          <mat-spinner *ngIf="isLoading" diameter="20"></mat-spinner>
+        </div>
+      </button>
+    </form>
+
+    <p class="switch-link">Already have an account? <a routerLink="/login">Log in</a></p>
+  </mat-card-content>
+</mat-card>
