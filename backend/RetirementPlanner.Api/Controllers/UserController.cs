@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using RetirementPlanner.Models;
+using RetirementPlanner.DTO.Requests;
+using RetirementPlanner.DTO.Responses;
+using RetirementPlanner.Mapping;
 using RetirementPlanner.Services.Interfaces;
 
 namespace RetirementPlanner.Controllers
@@ -9,32 +11,22 @@ namespace RetirementPlanner.Controllers
     public class UserController : ControllerBase
     {
         private readonly IUserService _userService;
-        private readonly ILogger<UserController> _logger;
 
-        public UserController(IUserService userService, ILogger<UserController> logger)
+        public UserController(IUserService userService)
         {
             _userService = userService;
-            _logger = logger;
         }
 
         [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] Login login, CancellationToken cancellationToken)
+        [ProducesResponseType<LoginResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<string>(StatusCodes.Status401Unauthorized)]
+        public async Task<IActionResult> Login(LoginRequest request, CancellationToken cancellationToken)
         {
-            if (login == null)
-                return BadRequest("Login credentials are required");
-
-            if (string.IsNullOrWhiteSpace(login.UserName))
-                return BadRequest("Username is required");
-
-            if (string.IsNullOrWhiteSpace(login.Password))
-                return BadRequest("Password is required");
-
-            var profile = await _userService.AuthenticateAsync(login.UserName, login.Password, cancellationToken);
-            if (profile == null)
-                return Unauthorized("Invalid username or password");
-
-            _logger.LogInformation("Successful login for user {UserId}", profile.ProfileId);
-            return Ok(profile);
+            var user = await _userService.AuthenticateAsync(request.UserName, request.Password, cancellationToken);
+            return user == null
+                ? Unauthorized("Invalid username or password")
+                : Ok(user.ToLoginResponse());
         }
     }
 }

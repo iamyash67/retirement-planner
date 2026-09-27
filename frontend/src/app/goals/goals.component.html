@@ -39,16 +39,19 @@
     <mat-form-field appearance="fill" class="full-width">
       <mat-label>Year</mat-label>
       <input matInput type="number" name="year" [(ngModel)]="addInvestmentData.year" required />
+      <mat-hint *ngIf="investmentFieldErrors['year'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
     </mat-form-field>
 
     <mat-form-field appearance="fill" class="full-width">
       <mat-label>Month</mat-label>
       <input matInput type="number" name="month" [(ngModel)]="addInvestmentData.month" required min="1" max="12" />
+      <mat-hint *ngIf="investmentFieldErrors['month'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
     </mat-form-field>
 
     <mat-form-field appearance="fill" class="full-width">
       <mat-label>Monthly Investment</mat-label>
       <input matInput type="number" name="monthlyInvestment" [(ngModel)]="addInvestmentData.monthlyInvestment" required min="1" />
+      <mat-hint *ngIf="investmentFieldErrors['monthlyInvestment'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
     </mat-form-field>
 
     <button mat-raised-button color="accent" type="submit" [disabled]="investmentForm.invalid">
@@ -92,21 +95,25 @@
     <mat-form-field appearance="fill" class="full-width">
       <mat-label>Current Age</mat-label>
       <input matInput type="number" name="currentAge" [(ngModel)]="newGoal.currentAge" required />
+      <mat-hint *ngIf="createFieldErrors['currentAge'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
     </mat-form-field>
 
     <mat-form-field appearance="fill" class="full-width">
       <mat-label>Retirement Age</mat-label>
       <input matInput type="number" name="retirementAge" [(ngModel)]="newGoal.retirementAge" required />
+      <mat-hint *ngIf="createFieldErrors['retirementAge'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
     </mat-form-field>
 
     <mat-form-field appearance="fill" class="full-width">
       <mat-label>Target Savings</mat-label>
       <input matInput type="number" name="targetSavings" [(ngModel)]="newGoal.targetSavings" required />
+      <mat-hint *ngIf="createFieldErrors['targetSavings'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
     </mat-form-field>
 
     <mat-form-field appearance="fill" class="full-width">
       <mat-label>Current Savings</mat-label>
       <input matInput type="number" name="currentSavings" [(ngModel)]="newGoal.currentSavings" required />
+      <mat-hint *ngIf="createFieldErrors['currentSavings'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
     </mat-form-field>
 
     <mat-form-field appearance="fill" class="full-width">

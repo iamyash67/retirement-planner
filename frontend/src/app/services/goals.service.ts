@@ -39,9 +39,9 @@ export class GoalsService {
     this.goalSubject.next(null);
   }
 
-  // POST api/goal
-  createGoal(goal: Partial<Goals>): Observable<string> {
-    return this.http.post(`${this.baseUrl}`, goal, { responseType: 'text' });
+  // POST api/goal (201 Created with the new goal)
+  createGoal(goal: Partial<Goals>): Observable<Goals> {
+    return this.http.post<Goals>(`${this.baseUrl}`, goal);
   }
 
   // POST api/financial/Add-Investment

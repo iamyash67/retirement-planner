@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using RetirementPlanner.Data;
 using RetirementPlanner.Data.Interfaces;
@@ -6,6 +7,7 @@ using RetirementPlanner.Repositories;
 using RetirementPlanner.Repositories.Interfaces;
 using RetirementPlanner.Services;
 using RetirementPlanner.Services.Interfaces;
+using RetirementPlanner.Validators;
 
 namespace RetirementPlanner.Infrastructure
 {
@@ -36,6 +38,9 @@ namespace RetirementPlanner.Infrastructure
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IGoalService, GoalService>();
             services.AddScoped<IContributionService, ContributionService>();
+
+            // Request validators (one per request DTO), run by FluentValidationFilter
+            services.AddValidatorsFromAssemblyContaining<LoginRequestValidator>(ServiceLifetime.Singleton);
 
             return services;
         }

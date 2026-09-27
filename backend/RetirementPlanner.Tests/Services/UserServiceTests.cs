@@ -38,18 +38,19 @@ namespace RetirementPlanner.Tests.Services
             new(_userRepo.Object, _profileRepo.Object, _hasher, new FixedTimeProvider(now), NullLogger<UserService>.Instance);
 
         [Fact]
-        public async Task AuthenticateAsync_WithCorrectPassword_ReturnsProfile()
+        public async Task AuthenticateAsync_WithCorrectPassword_ReturnsUserWithProfile()
         {
-            var profile = await CreateService(new DateTimeOffset(2026, 9, 27, 0, 0, 0, TimeSpan.Zero))
+            var user = await CreateService(new DateTimeOffset(2026, 9, 27, 0, 0, 0, TimeSpan.Zero))
                 .AuthenticateAsync(Email, Password);
 
-            Assert.NotNull(profile);
-            Assert.Equal(7, profile.ProfileId);
-            Assert.Equal("Jane", profile.FirstName);
-            Assert.Equal("Doe", profile.LastName);
-            Assert.Equal("Female", profile.Gender);
-            Assert.Equal(Email, profile.UserName);
-            Assert.Equal(36, profile.Age);
+            Assert.NotNull(user);
+            Assert.Equal(7, user.UserId);
+            Assert.Equal(Email, user.Email);
+            Assert.Equal("Jane", user.FirstName);
+            Assert.Equal("Doe", user.LastName);
+            Assert.Equal(new DateOnly(1990, 6, 15), user.DateOfBirth);
+            Assert.Equal("Female", user.Gender);
+            Assert.Equal(36, user.Age);
         }
 
         [Fact]

@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using RetirementPlanner.DTO;
 using RetirementPlanner.Infrastructure;
 using RetirementPlanner.Models;
 using RetirementPlanner.Repositories.Interfaces;
@@ -25,7 +24,7 @@ namespace RetirementPlanner.Tests.Integration
                 .BuildServiceProvider(validateScopes: true);
 
             var goalId = await CreateGoalAsync(provider);
-            var request = new FinancialDTO { GoalId = goalId, Year = 2026, Month = 7, MonthlyInvestment = 100m };
+            var command = new RecordContributionCommand(GoalId: goalId, Year: 2026, Month: 7, Amount: 100m);
 
             // Start every request before awaiting any, so they overlap on the database.
             using var start = new ManualResetEventSlim();
@@ -33,7 +32,7 @@ namespace RetirementPlanner.Tests.Integration
             {
                 start.Wait();
                 await using var scope = provider.CreateAsyncScope();
-                return await scope.ServiceProvider.GetRequiredService<IContributionService>().RecordAsync(request);
+                return await scope.ServiceProvider.GetRequiredService<IContributionService>().RecordAsync(command);
             })).ToArray();
             start.Set();
 

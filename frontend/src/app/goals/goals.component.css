@@ -43,6 +43,11 @@ p {
   margin: 10px 0;
 }
 
+/* Server-side validation message shown under the matching input */
+.field-error {
+  color: #ba1a1a;
+}
+
 .error-text {
   color: #d32f2f;
   font-weight: 500;

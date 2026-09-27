@@ -72,7 +72,7 @@ namespace RetirementPlanner.Tests.Integration
         }
 
         [Fact]
-        public async Task GoalRepository_CreateThenGet_MapsToApiShape()
+        public async Task GoalRepository_CreateThenGet_RoundTripsEveryColumn()
         {
             await using var uow = db.CreateUnitOfWork();
             var userId = await new UserRepository(uow).CreateAsync(MySqlFixture.UniqueEmail(), "hashed");
@@ -83,13 +83,19 @@ namespace RetirementPlanner.Tests.Integration
             var goal = await repo.GetByIdAsync(goalId);
 
             Assert.NotNull(goal);
-            Assert.Equal(goalId, goal.GoalId);
-            Assert.Equal(userId, goal.ProfileId);
+            Assert.Equal(goalId, goal.Id);
+            Assert.Equal(userId, goal.UserId);
+            Assert.Equal("Retirement", goal.Name);
             Assert.Equal(30, goal.CurrentAge);
             Assert.Equal(60, goal.RetirementAge);
-            Assert.Equal(1_000_000m, goal.TargetSavings);
-            Assert.Equal(2_500m, goal.MonthlyContribution);
+            Assert.Equal(1_000_000m, goal.TargetAmount);
             Assert.Equal(100_000m, goal.CurrentSavings);
+            Assert.Equal(0.06m, goal.ExpectedAnnualReturn);
+            Assert.Equal(0.12m, goal.ReturnVolatility);
+            Assert.Equal(0.025m, goal.InflationRate);
+            Assert.Equal(0m, goal.AnnualContributionIncrease);
+            Assert.Equal(2_500m, goal.PlannedMonthlyContribution);
+            Assert.NotEqual(default, goal.CreatedAt);
             Assert.True(await repo.ExistsForUserAsync(userId));
             Assert.Null(await repo.GetByIdAsync(int.MaxValue));
         }
@@ -104,7 +110,7 @@ namespace RetirementPlanner.Tests.Integration
             await repo.CreateAsync(NewGoal(userId));
             var newest = await repo.CreateAsync(NewGoal(userId));
 
-            Assert.Equal(newest, (await repo.GetLatestByUserIdAsync(userId))!.GoalId);
+            Assert.Equal(newest, (await repo.GetLatestByUserIdAsync(userId))!.Id);
             Assert.Null(await repo.GetLatestByUserIdAsync(int.MaxValue));
         }
 

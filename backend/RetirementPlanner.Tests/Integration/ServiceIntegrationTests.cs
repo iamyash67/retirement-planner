@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging.Abstractions;
 using RetirementPlanner.Data;
-using RetirementPlanner.DTO;
 using RetirementPlanner.Models;
 using RetirementPlanner.Repositories;
 using RetirementPlanner.Services;
@@ -25,10 +24,10 @@ namespace RetirementPlanner.Tests.Integration
             var userService = new UserService(new UserRepository(uow), new ProfileRepository(uow),
                 new PasswordHasher<User>(), TimeProvider.System, NullLogger<UserService>.Instance);
 
-            var profile = await userService.AuthenticateAsync(DevelopmentDataSeeder.DemoEmail, DevelopmentDataSeeder.DemoPassword);
-            Assert.NotNull(profile);
-            Assert.Equal("Demo", profile.FirstName);
-            Assert.Equal(DevelopmentDataSeeder.DemoEmail, profile.UserName);
+            var user = await userService.AuthenticateAsync(DevelopmentDataSeeder.DemoEmail, DevelopmentDataSeeder.DemoPassword);
+            Assert.NotNull(user);
+            Assert.Equal("Demo", user.FirstName);
+            Assert.Equal(DevelopmentDataSeeder.DemoEmail, user.Email);
             Assert.Null(await userService.AuthenticateAsync(DevelopmentDataSeeder.DemoEmail, "wrong"));
         }
 
@@ -45,24 +44,26 @@ namespace RetirementPlanner.Tests.Integration
             var contributionService = new ContributionService(uow, goals, new ContributionRepository(uow),
                 NullLogger<ContributionService>.Instance);
 
-            var request = new GoalDTO { ProfileId = userId, CurrentAge = 30, RetirementAge = 60, TargetSavings = 100_000m, CurrentSavings = 10_000m };
-            Assert.Equal(GoalCreationResult.Created, await goalService.CreateGoalAsync(request));
-            Assert.Equal(GoalCreationResult.AlreadyExists, await goalService.CreateGoalAsync(request));
-            Assert.Equal(GoalCreationResult.UserNotFound,
-                await goalService.CreateGoalAsync(new GoalDTO { ProfileId = int.MaxValue, CurrentAge = 30, RetirementAge = 60, TargetSavings = 1m }));
+            var command = new CreateGoalCommand(UserId: userId, CurrentAge: 30, RetirementAge: 60, TargetAmount: 100_000m, CurrentSavings: 10_000m);
+            var created = await goalService.CreateGoalAsync(command);
+            Assert.Equal(GoalCreationStatus.Created, created.Status);
+            Assert.Equal(GoalCreationStatus.AlreadyExists, (await goalService.CreateGoalAsync(command)).Status);
+            Assert.Equal(GoalCreationStatus.UserNotFound,
+                (await goalService.CreateGoalAsync(command with { UserId = int.MaxValue })).Status);
 
             var goal = await goalService.GetGoalForUserAsync(userId);
             Assert.NotNull(goal);
-            Assert.Equal(250m, goal.MonthlyContribution);
+            Assert.Equal(created.Goal!.Id, goal.Id);
+            Assert.Equal(250m, goal.PlannedMonthlyContribution);
 
-            var investment = new FinancialDTO { GoalId = goal.GoalId, Year = 2026, Month = 9, MonthlyInvestment = 1_000m };
+            var investment = new RecordContributionCommand(GoalId: goal.Id, Year: 2026, Month: 9, Amount: 1_000m);
             var recorded = await contributionService.RecordAsync(investment);
             Assert.Equal(ContributionStatus.Recorded, recorded.Status);
             Assert.Equal(11_000m, recorded.Goal!.CurrentSavings);
 
             var repeated = await contributionService.RecordAsync(investment);
             Assert.Equal(ContributionStatus.AlreadyRecorded, repeated.Status);
-            Assert.Equal(11m, await goalService.GetProgressAsync(goal.GoalId));
+            Assert.Equal(11m, await goalService.GetProgressAsync(goal.Id));
         }
 
         private async Task SeedAsync()

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using RetirementPlanner.Data.Interfaces;
-using RetirementPlanner.DTO;
 using RetirementPlanner.Models;
 using RetirementPlanner.Repositories.Interfaces;
 using RetirementPlanner.Services;
@@ -11,34 +10,31 @@ namespace RetirementPlanner.Tests.Services
 {
     public class GoalServiceTests
     {
-        private readonly Mock<IUnitOfWork> _unitOfWork = UnitOfWorkMock.Create<GoalCreationResult>();
+        private readonly Mock<IUnitOfWork> _unitOfWork = UnitOfWorkMock.Create<CreateGoalResult>();
         private readonly Mock<IGoalRepository> _goalRepo = new();
         private readonly Mock<IUserRepository> _userRepo = new();
 
         private GoalService CreateService() =>
             new(_unitOfWork.Object, _goalRepo.Object, _userRepo.Object, NullLogger<GoalService>.Instance);
 
-        private static GoalDTO ValidRequest() => new()
-        {
-            ProfileId = 3,
-            CurrentAge = 30,
-            RetirementAge = 60,
-            TargetSavings = 1_000_000m,
-            CurrentSavings = 100_000m
-        };
+        private static CreateGoalCommand ValidCommand() => new(
+            UserId: 3, CurrentAge: 30, RetirementAge: 60, TargetAmount: 1_000_000m, CurrentSavings: 100_000m);
 
         [Fact]
-        public async Task CreateGoalAsync_WithValidRequest_CreatesGoalWithDefaultsAndPlannedContribution()
+        public async Task CreateGoalAsync_WithValidCommand_CreatesGoalWithDefaultsAndPlannedContribution()
         {
             _userRepo.Setup(r => r.TryLockAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(true);
             NewGoal? saved = null;
             _goalRepo.Setup(r => r.CreateAsync(It.IsAny<NewGoal>(), It.IsAny<CancellationToken>()))
                 .Callback<NewGoal, CancellationToken>((g, _) => saved = g)
                 .ReturnsAsync(11);
+            var created = new Goal { Id = 11, UserId = 3 };
+            _goalRepo.Setup(r => r.GetByIdAsync(11, It.IsAny<CancellationToken>())).ReturnsAsync(created);
 
-            var result = await CreateService().CreateGoalAsync(ValidRequest());
+            var result = await CreateService().CreateGoalAsync(ValidCommand());
 
-            Assert.Equal(GoalCreationResult.Created, result);
+            Assert.Equal(GoalCreationStatus.Created, result.Status);
+            Assert.Same(created, result.Goal);
             Assert.NotNull(saved);
             Assert.Equal(3, saved.UserId);
             Assert.Equal(GoalService.DefaultName, saved.Name);
@@ -49,7 +45,7 @@ namespace RetirementPlanner.Tests.Services
             Assert.Equal(GoalService.DefaultInflationRate, saved.InflationRate);
             Assert.Equal(GoalService.DefaultAnnualContributionIncrease, saved.AnnualContributionIncrease);
             Assert.Equal(2500m, saved.PlannedMonthlyContribution); // 900,000 over 360 months
-            _unitOfWork.Verify(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<GoalCreationResult>>>(), It.IsAny<CancellationToken>()), Times.Once);
+            _unitOfWork.Verify(u => u.ExecuteInTransactionAsync(It.IsAny<Func<Task<CreateGoalResult>>>(), It.IsAny<CancellationToken>()), Times.Once);
         }
 
         [Fact]
@@ -60,14 +56,17 @@ namespace RetirementPlanner.Tests.Services
             _goalRepo.Setup(r => r.CreateAsync(It.IsAny<NewGoal>(), It.IsAny<CancellationToken>()))
                 .Callback<NewGoal, CancellationToken>((g, _) => saved = g)
                 .ReturnsAsync(11);
-            var request = ValidRequest();
-            request.Name = "  Early retirement ";
-            request.ExpectedAnnualReturn = 0.07m;
-            request.ReturnVolatility = 0.15m;
-            request.InflationRate = 0.03m;
-            request.AnnualContributionIncrease = 0.02m;
+            _goalRepo.Setup(r => r.GetByIdAsync(11, It.IsAny<CancellationToken>())).ReturnsAsync(new Goal { Id = 11 });
+            var command = ValidCommand() with
+            {
+                Name = "  Early retirement ",
+                ExpectedAnnualReturn = 0.07m,
+                ReturnVolatility = 0.15m,
+                InflationRate = 0.03m,
+                AnnualContributionIncrease = 0.02m
+            };
 
-            await CreateService().CreateGoalAsync(request);
+            await CreateService().CreateGoalAsync(command);
 
             Assert.Equal("Early retirement", saved!.Name);
             Assert.Equal(0.07m, saved.ExpectedAnnualReturn);
@@ -81,9 +80,10 @@ namespace RetirementPlanner.Tests.Services
         {
             _userRepo.Setup(r => r.TryLockAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(false);
 
-            var result = await CreateService().CreateGoalAsync(ValidRequest());
+            var result = await CreateService().CreateGoalAsync(ValidCommand());
 
-            Assert.Equal(GoalCreationResult.UserNotFound, result);
+            Assert.Equal(GoalCreationStatus.UserNotFound, result.Status);
+            Assert.Null(result.Goal);
             _goalRepo.Verify(r => r.CreateAsync(It.IsAny<NewGoal>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
@@ -93,9 +93,10 @@ namespace RetirementPlanner.Tests.Services
             _userRepo.Setup(r => r.TryLockAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(true);
             _goalRepo.Setup(r => r.ExistsForUserAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(true);
 
-            var result = await CreateService().CreateGoalAsync(ValidRequest());
+            var result = await CreateService().CreateGoalAsync(ValidCommand());
 
-            Assert.Equal(GoalCreationResult.AlreadyExists, result);
+            Assert.Equal(GoalCreationStatus.AlreadyExists, result.Status);
+            Assert.Null(result.Goal);
             _goalRepo.Verify(r => r.CreateAsync(It.IsAny<NewGoal>(), It.IsAny<CancellationToken>()), Times.Never);
         }
 
@@ -120,7 +121,7 @@ namespace RetirementPlanner.Tests.Services
         public async Task GetProgressAsync_ReturnsCurrentSavingsAsPercentageOfTarget()
         {
             _goalRepo.Setup(r => r.GetByIdAsync(5, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Goal { GoalId = 5, TargetSavings = 200_000m, CurrentSavings = 50_000m });
+                .ReturnsAsync(new Goal { Id = 5, TargetAmount = 200_000m, CurrentSavings = 50_000m });
 
             var progress = await CreateService().GetProgressAsync(5);
 
@@ -137,7 +138,7 @@ namespace RetirementPlanner.Tests.Services
         public async Task GetProgressAsync_WhenTargetIsZero_ReturnsNull()
         {
             _goalRepo.Setup(r => r.GetByIdAsync(5, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new Goal { GoalId = 5, TargetSavings = 0m, CurrentSavings = 10m });
+                .ReturnsAsync(new Goal { Id = 5, TargetAmount = 0m, CurrentSavings = 10m });
 
             Assert.Null(await CreateService().GetProgressAsync(5));
         }
@@ -145,7 +146,7 @@ namespace RetirementPlanner.Tests.Services
         [Fact]
         public async Task GetGoalForUserAsync_LooksUpByUserId()
         {
-            var goal = new Goal { GoalId = 9, ProfileId = 3 };
+            var goal = new Goal { Id = 9, UserId = 3 };
             _goalRepo.Setup(r => r.GetLatestByUserIdAsync(3, It.IsAny<CancellationToken>())).ReturnsAsync(goal);
 
             Assert.Same(goal, await CreateService().GetGoalForUserAsync(3));

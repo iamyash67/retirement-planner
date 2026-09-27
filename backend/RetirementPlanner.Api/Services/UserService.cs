@@ -27,7 +27,7 @@ namespace RetirementPlanner.Services
             _logger = logger;
         }
 
-        public async Task<Profile?> AuthenticateAsync(string email, string password, CancellationToken cancellationToken = default)
+        public async Task<AuthenticatedUser?> AuthenticateAsync(string email, string password, CancellationToken cancellationToken = default)
         {
             var user = await _userRepo.GetByEmailAsync(email, cancellationToken);
             if (user == null)
@@ -50,14 +50,15 @@ namespace RetirementPlanner.Services
             }
 
             var today = DateOnly.FromDateTime(_timeProvider.GetUtcNow().UtcDateTime);
-            return new Profile
+            return new AuthenticatedUser
             {
-                ProfileId = user.Id,
+                UserId = user.Id,
+                Email = user.Email,
                 FirstName = profile.FirstName,
                 LastName = profile.LastName,
+                DateOfBirth = profile.DateOfBirth,
                 Age = CalculateAge(profile.DateOfBirth, today),
-                Gender = profile.Gender,
-                UserName = user.Email
+                Gender = profile.Gender
             };
         }
 

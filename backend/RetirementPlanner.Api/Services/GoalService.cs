@@ -1,5 +1,4 @@
 using RetirementPlanner.Data.Interfaces;
-using RetirementPlanner.DTO;
 using RetirementPlanner.Models;
 using RetirementPlanner.Repositories.Interfaces;
 using RetirementPlanner.Services.Interfaces;
@@ -38,43 +37,46 @@ namespace RetirementPlanner.Services
         public Task<Goal?> GetGoalAsync(int goalId, CancellationToken cancellationToken = default) =>
             _goalRepo.GetByIdAsync(goalId, cancellationToken);
 
-        public Task<GoalCreationResult> CreateGoalAsync(GoalDTO goal, CancellationToken cancellationToken = default) =>
+        public Task<CreateGoalResult> CreateGoalAsync(CreateGoalCommand command, CancellationToken cancellationToken = default) =>
             _unitOfWork.ExecuteInTransactionAsync(async () =>
             {
                 // Locking the user serialises concurrent requests, so the one-goal check below can't race.
-                if (!await _userRepo.TryLockAsync(goal.ProfileId, cancellationToken))
-                    return GoalCreationResult.UserNotFound;
+                if (!await _userRepo.TryLockAsync(command.UserId, cancellationToken))
+                    return new CreateGoalResult(GoalCreationStatus.UserNotFound);
 
-                if (await _goalRepo.ExistsForUserAsync(goal.ProfileId, cancellationToken))
-                    return GoalCreationResult.AlreadyExists;
+                if (await _goalRepo.ExistsForUserAsync(command.UserId, cancellationToken))
+                    return new CreateGoalResult(GoalCreationStatus.AlreadyExists);
 
                 var goalId = await _goalRepo.CreateAsync(new NewGoal
                 {
-                    UserId = goal.ProfileId,
-                    Name = string.IsNullOrWhiteSpace(goal.Name) ? DefaultName : goal.Name.Trim(),
-                    CurrentAge = goal.CurrentAge,
-                    RetirementAge = goal.RetirementAge,
-                    TargetAmount = goal.TargetSavings,
-                    CurrentSavings = goal.CurrentSavings,
-                    ExpectedAnnualReturn = goal.ExpectedAnnualReturn ?? DefaultExpectedAnnualReturn,
-                    ReturnVolatility = goal.ReturnVolatility ?? DefaultReturnVolatility,
-                    InflationRate = goal.InflationRate ?? DefaultInflationRate,
-                    AnnualContributionIncrease = goal.AnnualContributionIncrease ?? DefaultAnnualContributionIncrease,
+                    UserId = command.UserId,
+                    Name = string.IsNullOrWhiteSpace(command.Name) ? DefaultName : command.Name.Trim(),
+                    CurrentAge = command.CurrentAge,
+                    RetirementAge = command.RetirementAge,
+                    TargetAmount = command.TargetAmount,
+                    CurrentSavings = command.CurrentSavings,
+                    ExpectedAnnualReturn = command.ExpectedAnnualReturn ?? DefaultExpectedAnnualReturn,
+                    ReturnVolatility = command.ReturnVolatility ?? DefaultReturnVolatility,
+                    InflationRate = command.InflationRate ?? DefaultInflationRate,
+                    AnnualContributionIncrease = command.AnnualContributionIncrease ?? DefaultAnnualContributionIncrease,
                     PlannedMonthlyContribution = CalculateMonthlyContribution(
-                        goal.TargetSavings, goal.CurrentSavings, goal.CurrentAge, goal.RetirementAge)
+                        command.TargetAmount, command.CurrentSavings, command.CurrentAge, command.RetirementAge)
                 }, cancellationToken);
 
-                _logger.LogInformation("Created goal {GoalId} for user {UserId}", goalId, goal.ProfileId);
-                return GoalCreationResult.Created;
+                _logger.LogInformation("Created goal {GoalId} for user {UserId}", goalId, command.UserId);
+
+                var goal = await _goalRepo.GetByIdAsync(goalId, cancellationToken)
+                    ?? throw new InvalidOperationException($"Goal {goalId} disappeared inside its own transaction.");
+                return new CreateGoalResult(GoalCreationStatus.Created, goal);
             }, cancellationToken);
 
         public async Task<decimal?> GetProgressAsync(int goalId, CancellationToken cancellationToken = default)
         {
             var goal = await _goalRepo.GetByIdAsync(goalId, cancellationToken);
-            if (goal == null || goal.TargetSavings == 0)
+            if (goal == null || goal.TargetAmount == 0)
                 return null;
 
-            return goal.CurrentSavings / goal.TargetSavings * 100;
+            return goal.CurrentSavings / goal.TargetAmount * 100;
         }
 
         /// <summary>

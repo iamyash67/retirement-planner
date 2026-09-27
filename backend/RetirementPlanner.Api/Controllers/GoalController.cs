@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
-using RetirementPlanner.DTO;
+using RetirementPlanner.DTO.Requests;
+using RetirementPlanner.DTO.Responses;
+using RetirementPlanner.Mapping;
 using RetirementPlanner.Models;
 using RetirementPlanner.Services.Interfaces;
 
@@ -17,46 +19,31 @@ namespace RetirementPlanner.Controllers
         }
 
         /// <summary>Gets the goal of the profile (user) with the given id.</summary>
-        [HttpGet("{profileId}")]
-        public async Task<IActionResult> GetGoal(int profileId, CancellationToken cancellationToken)
+        [HttpGet("{profileId}", Name = nameof(GetGoal))]
+        [ProducesResponseType<GoalResponse>(StatusCodes.Status200OK)]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<string>(StatusCodes.Status404NotFound)]
+        public async Task<IActionResult> GetGoal([FromRoute] GetGoalRequest request, CancellationToken cancellationToken)
         {
-            if (profileId <= 0)
-                return BadRequest("Invalid Profile ID");
-
-            var goal = await _goalService.GetGoalForUserAsync(profileId, cancellationToken);
-            if (goal == null)
-                return NotFound("Goal not found");
-
-            return Ok(goal);
+            var goal = await _goalService.GetGoalForUserAsync(request.ProfileId, cancellationToken);
+            return goal == null ? NotFound("Goal not found") : Ok(goal.ToResponse());
         }
 
         [HttpPost]
-        public async Task<IActionResult> CreateGoal([FromBody] GoalDTO newGoal, CancellationToken cancellationToken)
+        [ProducesResponseType<GoalResponse>(StatusCodes.Status201Created)]
+        [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType<string>(StatusCodes.Status404NotFound)]
+        [ProducesResponseType<string>(StatusCodes.Status409Conflict)]
+        public async Task<IActionResult> CreateGoal(CreateGoalRequest request, CancellationToken cancellationToken)
         {
-            if (newGoal == null)
-                return BadRequest("Goal data cannot be empty");
-
-            if (newGoal.ProfileId <= 0)
-                return BadRequest("Invalid Profile ID");
-
-            if (newGoal.CurrentAge <= 0 || newGoal.RetirementAge <= 0)
-                return BadRequest("Age values must be positive");
-
-            if (newGoal.CurrentAge >= newGoal.RetirementAge)
-                return BadRequest("Retirement age must be greater than current age");
-
-            if (newGoal.TargetSavings <= 0)
-                return BadRequest("Target savings must be positive");
-
-            if (newGoal.CurrentSavings >= newGoal.TargetSavings)
-                return BadRequest("You have enough savings to reach your goal");
-
-            return await _goalService.CreateGoalAsync(newGoal, cancellationToken) switch
+            var result = await _goalService.CreateGoalAsync(request.ToCommand(), cancellationToken);
+            return result.Status switch
             {
-                GoalCreationResult.Created => Ok("Goal created successfully"),
-                GoalCreationResult.AlreadyExists => Conflict("A goal already exists for this profile."),
-                GoalCreationResult.UserNotFound => NotFound("Profile not found"),
-                var result => throw new InvalidOperationException($"Unhandled goal creation result {result}.")
+                GoalCreationStatus.Created => CreatedAtRoute(
+                    nameof(GetGoal), new { profileId = request.ProfileId }, result.Goal!.ToResponse()),
+                GoalCreationStatus.AlreadyExists => Conflict("A goal already exists for this profile."),
+                GoalCreationStatus.UserNotFound => NotFound("Profile not found"),
+                var status => throw new InvalidOperationException($"Unhandled goal creation status {status}.")
             };
         }
     }
