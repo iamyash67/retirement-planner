@@ -12,7 +12,6 @@ namespace RetirementPlanner.Tests.Mapping
         {
             var request = new CreateGoalRequest
             {
-                ProfileId = 3,
                 CurrentAge = 30,
                 RetirementAge = 65,
                 TargetSavings = 900_000m,
@@ -24,7 +23,7 @@ namespace RetirementPlanner.Tests.Mapping
                 AnnualContributionIncrease = 0.02m
             };
 
-            var command = request.ToCommand();
+            var command = request.ToCommand(userId: 3);
 
             Assert.Equal(new CreateGoalCommand(
                 UserId: 3, CurrentAge: 30, RetirementAge: 65, TargetAmount: 900_000m, CurrentSavings: 50_000m,
@@ -35,7 +34,7 @@ namespace RetirementPlanner.Tests.Mapping
         [Fact]
         public void CreateGoalRequest_ToCommand_KeepsOmittedOptionalFieldsNull()
         {
-            var command = new CreateGoalRequest { ProfileId = 1, CurrentAge = 30, RetirementAge = 60, TargetSavings = 10m }.ToCommand();
+            var command = new CreateGoalRequest { CurrentAge = 30, RetirementAge = 60, TargetSavings = 10m }.ToCommand(userId: 1);
 
             Assert.Null(command.Name);
             Assert.Null(command.ExpectedAnnualReturn);
@@ -65,8 +64,8 @@ namespace RetirementPlanner.Tests.Mapping
 
             var response = goal.ToResponse();
 
-            Assert.Equal(3, response.ProfileId);
-            Assert.Equal(11, response.GoalId);
+            Assert.Equal(11, response.Id);
+            Assert.Equal("Retirement", response.Name);
             Assert.Equal(30, response.CurrentAge);
             Assert.Equal(60, response.RetirementAge);
             Assert.Equal(1_000_000m, response.TargetSavings);

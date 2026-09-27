@@ -25,17 +25,23 @@ namespace RetirementPlanner.Repositories
             _unitOfWork = unitOfWork;
         }
 
-        public Task<Goal?> GetLatestByUserIdAsync(int userId, CancellationToken cancellationToken = default) =>
-            QuerySingleOrDefaultAsync(
-                $"{SelectGoal} WHERE g.UserId = @UserId ORDER BY g.CreatedAt DESC, g.Id DESC LIMIT 1",
-                new { UserId = userId }, cancellationToken);
+        public async Task<IReadOnlyList<Goal>> ListByUserIdAsync(int userId, CancellationToken cancellationToken = default)
+        {
+            var connection = await _unitOfWork.GetConnectionAsync(cancellationToken);
+            var goals = await connection.QueryAsync<Goal>(new CommandDefinition(
+                $"{SelectGoal} WHERE g.UserId = @UserId ORDER BY g.CreatedAt, g.Id",
+                new { UserId = userId }, _unitOfWork.Transaction, cancellationToken: cancellationToken));
+            return goals.AsList();
+        }
 
-        public Task<Goal?> GetByIdAsync(int goalId, CancellationToken cancellationToken = default) =>
-            QuerySingleOrDefaultAsync($"{SelectGoal} WHERE g.Id = @GoalId", new { GoalId = goalId }, cancellationToken);
+        public Task<Goal?> GetForUserAsync(int goalId, int userId, CancellationToken cancellationToken = default) =>
+            QuerySingleOrDefaultAsync($"{SelectGoal} WHERE g.Id = @GoalId AND g.UserId = @UserId",
+                new { GoalId = goalId, UserId = userId }, cancellationToken);
 
         // FOR UPDATE on the outer query locks only the Goals row, not the contributions read by the subquery.
-        public Task<Goal?> GetByIdForUpdateAsync(int goalId, CancellationToken cancellationToken = default) =>
-            QuerySingleOrDefaultAsync($"{SelectGoal} WHERE g.Id = @GoalId FOR UPDATE", new { GoalId = goalId }, cancellationToken);
+        public Task<Goal?> GetForUserForUpdateAsync(int goalId, int userId, CancellationToken cancellationToken = default) =>
+            QuerySingleOrDefaultAsync($"{SelectGoal} WHERE g.Id = @GoalId AND g.UserId = @UserId FOR UPDATE",
+                new { GoalId = goalId, UserId = userId }, cancellationToken);
 
         public async Task<bool> ExistsForUserAsync(int userId, CancellationToken cancellationToken = default)
         {

@@ -93,6 +93,20 @@ namespace RetirementPlanner.Tests.Services
         }
 
         [Fact]
+        public async Task GetAsync_ReturnsUserWithProfile_OrNullWhenMissing()
+        {
+            _userRepo.Setup(r => r.GetByIdAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(_user);
+            var service = CreateService(new DateTimeOffset(2026, 9, 27, 0, 0, 0, TimeSpan.Zero));
+
+            var user = await service.GetAsync(7);
+
+            Assert.NotNull(user);
+            Assert.Equal(Email, user.Email);
+            Assert.Equal(36, user.Age);
+            Assert.Null(await service.GetAsync(8));
+        }
+
+        [Fact]
         public async Task AuthenticateAsync_WhenRepositoryThrows_PropagatesException()
         {
             _userRepo.Setup(r => r.GetByEmailAsync(Email, It.IsAny<CancellationToken>()))

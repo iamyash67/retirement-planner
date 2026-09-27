@@ -26,11 +26,12 @@ namespace RetirementPlanner.Tests.Mapping
 
         [Theory]
         [MemberData(nameof(ResponseTypes))]
-        public void NoResponseDto_ExposesPasswordFields(Type responseType)
+        public void NoResponseDto_ExposesPasswordOrRefreshTokenFields(Type responseType)
         {
             Assert.DoesNotContain(responseType.GetProperties(),
                 p => p.Name.Contains("Password", StringComparison.OrdinalIgnoreCase)
-                  || p.Name.Contains("Hash", StringComparison.OrdinalIgnoreCase));
+                  || p.Name.Contains("Hash", StringComparison.OrdinalIgnoreCase)
+                  || p.Name.Contains("RefreshToken", StringComparison.OrdinalIgnoreCase));
         }
 
         [Theory]
@@ -45,8 +46,8 @@ namespace RetirementPlanner.Tests.Mapping
         public void TheContractTestsFindTheDtos()
         {
             Assert.Equal(5, RequestTypes().Count);
-            Assert.Equal(3, ResponseTypes().Count);
-            Assert.True(typeof(LoginResponse).IsClass);
+            Assert.Equal(5, ResponseTypes().Count);
+            Assert.Contains(ApiTypes, t => t == typeof(AuthResponse));
         }
     }
 }

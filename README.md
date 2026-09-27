@@ -1,6 +1,6 @@
 # Retirement Planner
 
-A web app for planning retirement savings. Users log in, set a retirement goal (current age,
+A web app for planning retirement savings. Users register or log in, set a retirement goal (current age,
 retirement age, target amount and current savings), record monthly investments, and track how
 close they are to the target.
 
@@ -41,8 +41,9 @@ Not-found (404), conflict (409) and bad-login (401) responses stay plain strings
 are returned as RFC 7807 ProblemDetails by a global exception handler. See
 [docs/database.md](docs/database.md) for the schema, an ER diagram and the design decisions.
 
-The Angular frontend uses standalone components (login, profile, goals, dashboard header) and
-services that call the API, with a route guard protecting the dashboard pages.
+The Angular frontend uses standalone components (login, register, profile, goals, dashboard header)
+and services that call the API. An HTTP interceptor attaches the access token and refreshes it silently
+on a 401, and route guards use the in-memory auth state to protect the dashboard pages.
 
 ## Tech stack
 
@@ -59,7 +60,8 @@ backend/
   RetirementPlanner.sln
   global.json                   .NET SDK pin
   RetirementPlanner.Api/
-    Controllers/                User, Goal and FinancialData endpoints
+    Controllers/                Auth and Goals endpoints
+    Auth/                       JWT options and issuing, refresh-token cookie and hashing, auth setup
     Services/                   Business logic (+ Interfaces/)
     Repositories/               Data access with Dapper (+ Interfaces/)
     Data/                       Connection factory, unit of work, migrator, dev seeder (+ Interfaces/)
@@ -77,8 +79,8 @@ docker/mysql-init/              Creates the empty database on first container st
 docs/database.md                Schema, ER diagram and design decisions
 frontend/
   src/app/
-    login/ profile/ goals/ dashboard/   Components
-    services/                           API clients and auth guard
+    login/ register/ profile/ goals/ dashboard/   Components
+    services/                           API clients, auth service, interceptor and guards
     models/                             TypeScript interfaces
 docker-compose.yml              MySQL service
 .env.example                    Template for local database passwords
@@ -110,8 +112,12 @@ local MySQL server on 3306.
 cd backend/RetirementPlanner.Api
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" \
   "Server=localhost;Port=3307;Database=retirement_planner;User=retirement_planner_app;Password=<MYSQL_PASSWORD from .env>;"
+dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)"
 dotnet run --launch-profile http
 ```
+
+The JWT signing key is required: the API refuses to start without one (at least 32 bytes). Outside
+development, set it with the environment variable `Jwt__SigningKey`. Never put it in `appsettings.json`.
 
 In the Development environment the API also seeds a demo user on startup.
 
@@ -124,7 +130,10 @@ npm install
 npm start
 ```
 
-Log in with `demo@example.com` / `demo123`.
+Log in with `demo@example.com` / `demo123`, or create an account on the register page.
+
+The refresh-token cookie is `Secure`. Browsers accept that over plain HTTP only for `localhost`, so use
+`http://localhost:4200` and not `http://127.0.0.1:4200` or a LAN address.
 
 ### Tests
 
@@ -133,12 +142,35 @@ cd backend
 dotnet test    # unit tests, plus integration tests that start MySQL with Testcontainers (Docker must be running)
 ```
 
+## Authentication
+
+- **Passwords** are hashed with ASP.NET Core's `PasswordHasher`.
+- **Access tokens** are JWTs (HS256) that live for 15 minutes and are sent as `Authorization: Bearer <token>`.
+  The frontend keeps them in memory only; nothing goes into `localStorage` or `sessionStorage`.
+- **Refresh tokens** are random values sent in an httpOnly, Secure, SameSite=Strict cookie scoped to
+  `/api/auth`. Only their SHA-256 hash is stored.
+  - Each refresh rotates the token.
+  - Presenting an already-used token revokes that login's whole token family. The exception is a token
+    rotated within the last 10 seconds (`Jwt:RefreshTokenReuseGraceSeconds`): two tabs refreshing at once
+    is a race, not theft, so the later request gets a 401 but the family is kept.
+  - After a page reload, the frontend restores the session by calling `/api/auth/refresh`.
+- **Every endpoint except `/api/auth/*` requires an access token.** The user id comes only from the token,
+  never from the route or the body. Another user's goal returns 404.
+- **Rate limit:** login, register and refresh share a limit of 10 requests per minute per client IP
+  (`RateLimiting:Auth`). Over the limit, they return 429 with `Retry-After`.
+
+See [docs/security.md](docs/security.md) for the reasoning and trade-offs behind each of these decisions.
+
 ## API
 
-| Method | Route | Purpose |
-|---|---|---|
-| POST | `/api/user/login` | Validate email and password, return profile |
-| GET | `/api/goal/{profileId}` | Get the profile's goal |
-| POST | `/api/goal` | Create a goal (one per profile); 201 with the goal |
-| POST | `/api/financial/Add-Investment` | Record a month's investment (409 if already recorded) |
-| GET | `/api/financial/progress/{goalId}` | Percentage of target saved |
+| Method | Route | Auth | Purpose |
+|---|---|---|---|
+| POST | `/api/auth/register` | – | Create an account and sign in; 201 with access token, sets the refresh cookie |
+| POST | `/api/auth/login` | – | Sign in with email and password; 200 with access token, sets the refresh cookie |
+| POST | `/api/auth/refresh` | cookie | Rotate the refresh cookie and return a new access token |
+| POST | `/api/auth/logout` | cookie | Revoke the refresh token family and clear the cookie; 204 |
+| GET | `/api/goals` | bearer | The current user's goals |
+| POST | `/api/goals` | bearer | Create a goal (one per user for now); 201 with the goal |
+| GET | `/api/goals/{id}` | bearer | One of the current user's goals (404 for anyone else's) |
+| POST | `/api/goals/{id}/contributions` | bearer | Record a month's contribution; 201, 409 if the month is already recorded |
+| GET | `/api/goals/{id}/progress` | bearer | Percentage of the target saved |

@@ -30,8 +30,8 @@ namespace RetirementPlanner.Repositories
         public async Task<int> CreateAsync(Contribution contribution, CancellationToken cancellationToken = default)
         {
             const string sql = """
-                INSERT INTO Contributions (GoalId, `Year`, `Month`, Amount)
-                VALUES (@GoalId, @Year, @Month, @Amount);
+                INSERT INTO Contributions (GoalId, `Year`, `Month`, Amount, RecordedAt)
+                VALUES (@GoalId, @Year, @Month, @Amount, @RecordedAt);
                 SELECT LAST_INSERT_ID();
                 """;
 

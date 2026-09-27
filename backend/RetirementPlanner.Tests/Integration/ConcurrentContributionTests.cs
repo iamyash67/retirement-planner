@@ -23,8 +23,8 @@ namespace RetirementPlanner.Tests.Integration
                 .AddRetirementPlanner(db.ConnectionString)
                 .BuildServiceProvider(validateScopes: true);
 
-            var goalId = await CreateGoalAsync(provider);
-            var command = new RecordContributionCommand(GoalId: goalId, Year: 2026, Month: 7, Amount: 100m);
+            var (userId, goalId) = await CreateGoalAsync(provider);
+            var command = new RecordContributionCommand(UserId: userId, GoalId: goalId, Year: 2026, Month: 7, Amount: 100m);
 
             // Start every request before awaiting any, so they overlap on the database.
             using var start = new ManualResetEventSlim();
@@ -44,16 +44,17 @@ namespace RetirementPlanner.Tests.Integration
             Assert.Equal(1, await db.ScalarAsync<long>(
                 "SELECT COUNT(*) FROM Contributions WHERE GoalId = @goalId AND `Year` = 2026 AND `Month` = 7",
                 new { goalId }));
-            Assert.Equal(100_100m, results.Single(r => r.Status == ContributionStatus.Recorded).Goal!.CurrentSavings);
+            Assert.Equal(100m, results.Single(r => r.Status == ContributionStatus.Recorded).Contribution!.Amount);
         }
 
-        private static async Task<int> CreateGoalAsync(IServiceProvider provider)
+        private static async Task<(int UserId, int GoalId)> CreateGoalAsync(IServiceProvider provider)
         {
             await using var scope = provider.CreateAsyncScope();
             var userId = await scope.ServiceProvider.GetRequiredService<IUserRepository>()
                 .CreateAsync(MySqlFixture.UniqueEmail(), "hashed");
-            return await scope.ServiceProvider.GetRequiredService<IGoalRepository>()
+            var goalId = await scope.ServiceProvider.GetRequiredService<IGoalRepository>()
                 .CreateAsync(RepositoryTests.NewGoal(userId));
+            return (userId, goalId);
         }
     }
 }

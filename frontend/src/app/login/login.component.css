@@ -103,3 +103,9 @@ mat-icon {
   color: #5c6bc0; /* Optional: match your theme */
 }
 
+
+/* Link between the login and register pages */
+.switch-link {
+  margin-top: 16px;
+  text-align: center;
+}

@@ -15,7 +15,7 @@
   <p><strong>Retirement Age:</strong> <span class="normal-text"> {{ goal.retirementAge }}</span></p>
   <p><strong>Target Savings:</strong> <span class="normal-text"> {{ goal.targetSavings }}</span></p>
   <p><strong>Current Savings:</strong> <span class="normal-text"> {{ goal.currentSavings }}</span></p>
-  <p *ngIf="goal.monthlyContribution !== undefined">
+  <p>
     <strong>Monthly Contribution:</strong> <span class="normal-text"> {{ goal.monthlyContribution }}</span>
   </p>
 
@@ -50,8 +50,8 @@
 
     <mat-form-field appearance="fill" class="full-width">
       <mat-label>Monthly Investment</mat-label>
-      <input matInput type="number" name="monthlyInvestment" [(ngModel)]="addInvestmentData.monthlyInvestment" required min="1" />
-      <mat-hint *ngIf="investmentFieldErrors['monthlyInvestment'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
+      <input matInput type="number" name="amount" [(ngModel)]="addInvestmentData.amount" required min="1" />
+      <mat-hint *ngIf="investmentFieldErrors['amount'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
     </mat-form-field>
 
     <button mat-raised-button color="accent" type="submit" [disabled]="investmentForm.invalid">

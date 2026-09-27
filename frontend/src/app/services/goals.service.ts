@@ -1,63 +1,33 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, BehaviorSubject } from 'rxjs';
-import { tap } from 'rxjs/operators';
-import { Goals } from '../models/goals.model';
+import { Observable } from 'rxjs';
+import { API_BASE_URL } from '../api.config';
+import { AddContributionRequest, Contribution, CreateGoalRequest, Goal, GoalProgress } from '../models/goals.model';
 
-@Injectable({
-  providedIn: 'root',
-})
+/** The signed-in user's goals. The API identifies the user from the access token, never from the URL. */
+@Injectable({ providedIn: 'root' })
 export class GoalsService {
-  private baseUrl = 'http://localhost:5294/api/goal';
-  private financialBaseUrl = 'http://localhost:5294/api/financial';
-
-  // Caching the goal data
-  private goalSubject = new BehaviorSubject<Goals | null>(null);
-  goal$ = this.goalSubject.asObservable();
+  private readonly baseUrl = `${API_BASE_URL}/goals`;
 
   constructor(private http: HttpClient) {}
 
-  // GET api/goal/{profileId}
-  getGoalByProfileId(profileId: number): Observable<Goals> {
-    return this.http.get<Goals>(`${this.baseUrl}/${profileId}`).pipe(
-      tap((goal) => this.goalSubject.next(goal)) // cache on success
-    );
+  listGoals(): Observable<Goal[]> {
+    return this.http.get<Goal[]>(this.baseUrl);
   }
 
-  // Set cached goal manually (used in ProfileComponent)
-  setGoal(goal: Goals): void {
-    this.goalSubject.next(goal);
+  getGoal(goalId: number): Observable<Goal> {
+    return this.http.get<Goal>(`${this.baseUrl}/${goalId}`);
   }
 
-  // Get cached goal
-  getCachedGoal(): Goals | null {
-    return this.goalSubject.value;
+  createGoal(goal: CreateGoalRequest): Observable<Goal> {
+    return this.http.post<Goal>(this.baseUrl, goal);
   }
 
-  // Clear cached goal (optional for logout, etc.)
-  clearCachedGoal(): void {
-    this.goalSubject.next(null);
+  addContribution(goalId: number, contribution: AddContributionRequest): Observable<Contribution> {
+    return this.http.post<Contribution>(`${this.baseUrl}/${goalId}/contributions`, contribution);
   }
 
-  // POST api/goal (201 Created with the new goal)
-  createGoal(goal: Partial<Goals>): Observable<Goals> {
-    return this.http.post<Goals>(`${this.baseUrl}`, goal);
-  }
-
-  // POST api/financial/Add-Investment
-  addInvestment(investment: {
-    goalId: number;
-    year: number;
-    month: number;
-    monthlyInvestment: number;
-  }): Observable<Goals> {
-    return this.http.post<Goals>(`${this.financialBaseUrl}/Add-Investment`, investment);
-  }
-
-  // GET api/financial/progress/{goalId}
-  getGoalProgress(goalId: number): Observable<{ goalId: number; progress: string }> {
-  return this.http.get<{ goalId: number; progress: string }>(
-    `${this.financialBaseUrl}/progress/${goalId}`
-  );
+  getProgress(goalId: number): Observable<GoalProgress> {
+    return this.http.get<GoalProgress>(`${this.baseUrl}/${goalId}/progress`);
   }
 }

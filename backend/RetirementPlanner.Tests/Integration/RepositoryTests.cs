@@ -80,7 +80,7 @@ namespace RetirementPlanner.Tests.Integration
 
             Assert.False(await repo.ExistsForUserAsync(userId));
             var goalId = await repo.CreateAsync(NewGoal(userId));
-            var goal = await repo.GetByIdAsync(goalId);
+            var goal = await repo.GetForUserAsync(goalId, userId);
 
             Assert.NotNull(goal);
             Assert.Equal(goalId, goal.Id);
@@ -97,21 +97,29 @@ namespace RetirementPlanner.Tests.Integration
             Assert.Equal(2_500m, goal.PlannedMonthlyContribution);
             Assert.NotEqual(default, goal.CreatedAt);
             Assert.True(await repo.ExistsForUserAsync(userId));
-            Assert.Null(await repo.GetByIdAsync(int.MaxValue));
+            Assert.Null(await repo.GetForUserAsync(int.MaxValue, userId));
         }
 
         [Fact]
-        public async Task GoalRepository_GetLatestByUserId_ReturnsNewestGoal()
+        public async Task GoalRepository_OnlyReturnsGoalsOwnedByTheGivenUser()
         {
             await using var uow = db.CreateUnitOfWork();
-            var userId = await new UserRepository(uow).CreateAsync(MySqlFixture.UniqueEmail(), "hashed");
+            var users = new UserRepository(uow);
+            var owner = await users.CreateAsync(MySqlFixture.UniqueEmail(), "hashed");
+            var other = await users.CreateAsync(MySqlFixture.UniqueEmail(), "hashed");
             var repo = new GoalRepository(uow);
 
-            await repo.CreateAsync(NewGoal(userId));
-            var newest = await repo.CreateAsync(NewGoal(userId));
+            var first = await repo.CreateAsync(NewGoal(owner));
+            var second = await repo.CreateAsync(NewGoal(owner));
 
-            Assert.Equal(newest, (await repo.GetLatestByUserIdAsync(userId))!.Id);
-            Assert.Null(await repo.GetLatestByUserIdAsync(int.MaxValue));
+            Assert.Equal([first, second], (await repo.ListByUserIdAsync(owner)).Select(g => g.Id));
+            Assert.Empty(await repo.ListByUserIdAsync(other));
+            Assert.Null(await repo.GetForUserAsync(first, other));
+
+            await uow.BeginAsync();
+            Assert.NotNull(await repo.GetForUserForUpdateAsync(first, owner));
+            Assert.Null(await repo.GetForUserForUpdateAsync(first, other));
+            await uow.RollbackAsync();
         }
 
         [Fact]
@@ -123,11 +131,11 @@ namespace RetirementPlanner.Tests.Integration
             var contributions = new ContributionRepository(uow);
             var goalId = await goals.CreateAsync(NewGoal(userId));
 
-            await contributions.CreateAsync(new Contribution { GoalId = goalId, Year = 2026, Month = 1, Amount = 500m });
-            await contributions.CreateAsync(new Contribution { GoalId = goalId, Year = 2026, Month = 2, Amount = 250.50m });
+            await contributions.CreateAsync(NewContribution(goalId, 2026, 1, 500m));
+            await contributions.CreateAsync(NewContribution(goalId, 2026, 2, 250.50m));
 
-            Assert.Equal(100_750.50m, (await goals.GetByIdAsync(goalId))!.CurrentSavings);
-            Assert.Equal(100_750.50m, (await goals.GetLatestByUserIdAsync(userId))!.CurrentSavings);
+            Assert.Equal(100_750.50m, (await goals.GetForUserAsync(goalId, userId))!.CurrentSavings);
+            Assert.Equal(100_750.50m, Assert.Single(await goals.ListByUserIdAsync(userId)).CurrentSavings);
         }
 
         [Fact]
@@ -137,7 +145,7 @@ namespace RetirementPlanner.Tests.Integration
             var userId = await new UserRepository(uow).CreateAsync(MySqlFixture.UniqueEmail(), "hashed");
             var goalId = await new GoalRepository(uow).CreateAsync(NewGoal(userId));
             var repo = new ContributionRepository(uow);
-            var contribution = new Contribution { GoalId = goalId, Year = 2026, Month = 3, Amount = 100m };
+            var contribution = NewContribution(goalId, 2026, 3, 100m);
 
             Assert.False(await repo.ExistsAsync(goalId, 2026, 3));
             Assert.True(await repo.CreateAsync(contribution) > 0);
@@ -147,6 +155,15 @@ namespace RetirementPlanner.Tests.Integration
             var ex = await Assert.ThrowsAsync<MySqlException>(() => repo.CreateAsync(contribution));
             Assert.Equal(MySqlErrorCode.DuplicateKeyEntry, ex.ErrorCode);
         }
+
+        internal static Contribution NewContribution(int goalId, int year, int month, decimal amount) => new()
+        {
+            GoalId = goalId,
+            Year = year,
+            Month = month,
+            Amount = amount,
+            RecordedAt = DateTime.UtcNow
+        };
 
         internal static NewGoal NewGoal(int userId) => new()
         {

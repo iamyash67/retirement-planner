@@ -7,21 +7,21 @@
     <mat-card-title>Login</mat-card-title>
   </mat-card-header>
   <mat-card-content>
-    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" autocomplete="off">
+    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
 
-      <!-- Username Field with Icon -->
+      <!-- Email Field with Icon -->
       <mat-form-field appearance="fill">
-        <mat-label>Username</mat-label>
+        <mat-label>Email</mat-label>
         <mat-icon matPrefix>person</mat-icon>
-        <input matInput formControlName="username" required name="custom-username" autocomplete="off">
-        <mat-hint *ngIf="fieldErrors['userName'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
+        <input matInput type="email" formControlName="email" required name="email" autocomplete="username">
+        <mat-hint *ngIf="fieldErrors['email'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
       </mat-form-field>
 
       <!-- Password Field with Icon -->
       <mat-form-field appearance="fill">
         <mat-label>Password</mat-label>
         <mat-icon matPrefix>lock</mat-icon>
-        <input matInput type="password" formControlName="password" required name="custom-password" autocomplete="off">
+        <input matInput type="password" formControlName="password" required name="password" autocomplete="current-password">
         <mat-hint *ngIf="fieldErrors['password'] as fieldError" class="field-error">{{ fieldError }}</mat-hint>
       </mat-form-field>
 
@@ -38,5 +38,7 @@
         </div>
       </button>
     </form>
+
+    <p class="switch-link">No account yet? <a routerLink="/register">Create one</a></p>
   </mat-card-content>
 </mat-card>

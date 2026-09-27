@@ -1,8 +1,8 @@
 namespace RetirementPlanner.DTO.Requests
 {
+    /// <summary>Body of POST api/goals. The owner is always the current user, taken from the access token.</summary>
     public class CreateGoalRequest
     {
-        public int ProfileId { get; set; }
         public int CurrentAge { get; set; }
         public int RetirementAge { get; set; }
         public decimal TargetSavings { get; set; }

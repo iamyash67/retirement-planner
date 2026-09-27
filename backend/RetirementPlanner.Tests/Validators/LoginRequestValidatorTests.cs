@@ -11,7 +11,15 @@ namespace RetirementPlanner.Tests.Validators
         [Fact]
         public void ValidRequest_Passes()
         {
-            _validator.TestValidate(new LoginRequest { UserName = "demo@example.com", Password = "demo123" })
+            _validator.TestValidate(new LoginRequest { Email = "demo@example.com", Password = "demo123" })
+                .ShouldNotHaveAnyValidationErrors();
+        }
+
+        [Fact]
+        public void ShortPassword_IsNotRejectedAtLogin()
+        {
+            // Length rules apply when registering; existing accounts (like the demo user) must still sign in.
+            _validator.TestValidate(new LoginRequest { Email = "demo@example.com", Password = "x" })
                 .ShouldNotHaveAnyValidationErrors();
         }
 
@@ -19,10 +27,10 @@ namespace RetirementPlanner.Tests.Validators
         [InlineData("")]
         [InlineData("   ")]
         [InlineData(null)]
-        public void MissingUserName_Fails(string? userName)
+        public void MissingEmail_Fails(string? email)
         {
-            _validator.TestValidate(new LoginRequest { UserName = userName!, Password = "demo123" })
-                .ShouldHaveValidationErrorFor(r => r.UserName).WithErrorMessage("Username is required")
+            _validator.TestValidate(new LoginRequest { Email = email!, Password = "demo123" })
+                .ShouldHaveValidationErrorFor(r => r.Email).WithErrorMessage("Email is required")
                 .Only();
         }
 
@@ -31,7 +39,7 @@ namespace RetirementPlanner.Tests.Validators
         [InlineData(null)]
         public void MissingPassword_Fails(string? password)
         {
-            _validator.TestValidate(new LoginRequest { UserName = "demo@example.com", Password = password! })
+            _validator.TestValidate(new LoginRequest { Email = "demo@example.com", Password = password! })
                 .ShouldHaveValidationErrorFor(r => r.Password).WithErrorMessage("Password is required")
                 .Only();
         }

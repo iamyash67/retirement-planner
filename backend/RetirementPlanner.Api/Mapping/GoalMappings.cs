@@ -7,8 +7,9 @@ namespace RetirementPlanner.Mapping
 {
     public static class GoalMappings
     {
-        public static CreateGoalCommand ToCommand(this CreateGoalRequest request) => new(
-            UserId: request.ProfileId,
+        /// <summary>The owner is the authenticated user; the request has no say in it.</summary>
+        public static CreateGoalCommand ToCommand(this CreateGoalRequest request, int userId) => new(
+            UserId: userId,
             CurrentAge: request.CurrentAge,
             RetirementAge: request.RetirementAge,
             TargetAmount: request.TargetSavings,
@@ -20,8 +21,8 @@ namespace RetirementPlanner.Mapping
             AnnualContributionIncrease: request.AnnualContributionIncrease);
 
         public static GoalResponse ToResponse(this Goal goal) => new(
-            ProfileId: goal.UserId,
-            GoalId: goal.Id,
+            Id: goal.Id,
+            Name: goal.Name,
             CurrentAge: goal.CurrentAge,
             RetirementAge: goal.RetirementAge,
             TargetSavings: goal.TargetAmount,

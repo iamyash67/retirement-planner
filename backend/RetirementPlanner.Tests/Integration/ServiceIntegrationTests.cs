@@ -42,7 +42,7 @@ namespace RetirementPlanner.Tests.Integration
             var goals = new GoalRepository(uow);
             var goalService = new GoalService(uow, goals, new UserRepository(uow), NullLogger<GoalService>.Instance);
             var contributionService = new ContributionService(uow, goals, new ContributionRepository(uow),
-                NullLogger<ContributionService>.Instance);
+                TimeProvider.System, NullLogger<ContributionService>.Instance);
 
             var command = new CreateGoalCommand(UserId: userId, CurrentAge: 30, RetirementAge: 60, TargetAmount: 100_000m, CurrentSavings: 10_000m);
             var created = await goalService.CreateGoalAsync(command);
@@ -51,19 +51,25 @@ namespace RetirementPlanner.Tests.Integration
             Assert.Equal(GoalCreationStatus.UserNotFound,
                 (await goalService.CreateGoalAsync(command with { UserId = int.MaxValue })).Status);
 
-            var goal = await goalService.GetGoalForUserAsync(userId);
-            Assert.NotNull(goal);
+            var goal = Assert.Single(await goalService.ListGoalsAsync(userId));
             Assert.Equal(created.Goal!.Id, goal.Id);
             Assert.Equal(250m, goal.PlannedMonthlyContribution);
 
-            var investment = new RecordContributionCommand(GoalId: goal.Id, Year: 2026, Month: 9, Amount: 1_000m);
+            var investment = new RecordContributionCommand(UserId: userId, GoalId: goal.Id, Year: 2026, Month: 9, Amount: 1_000m);
             var recorded = await contributionService.RecordAsync(investment);
             Assert.Equal(ContributionStatus.Recorded, recorded.Status);
-            Assert.Equal(11_000m, recorded.Goal!.CurrentSavings);
+            Assert.Equal(1_000m, recorded.Contribution!.Amount);
+            Assert.Equal(11_000m, (await goalService.GetGoalAsync(userId, goal.Id))!.CurrentSavings);
 
             var repeated = await contributionService.RecordAsync(investment);
             Assert.Equal(ContributionStatus.AlreadyRecorded, repeated.Status);
-            Assert.Equal(11m, await goalService.GetProgressAsync(goal.Id));
+            Assert.Equal(11m, await goalService.GetProgressAsync(userId, goal.Id));
+
+            // Another user sees none of it and cannot write to it.
+            Assert.Null(await goalService.GetGoalAsync(userId + 1_000_000, goal.Id));
+            Assert.Null(await goalService.GetProgressAsync(userId + 1_000_000, goal.Id));
+            Assert.Equal(ContributionStatus.GoalNotFound,
+                (await contributionService.RecordAsync(investment with { UserId = userId + 1_000_000, Month = 10 })).Status);
         }
 
         private async Task SeedAsync()

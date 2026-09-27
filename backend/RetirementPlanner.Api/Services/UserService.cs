@@ -42,12 +42,23 @@ namespace RetirementPlanner.Services
                 return null;
             }
 
+            var authenticated = await WithProfileAsync(user, cancellationToken);
+            if (authenticated == null)
+                _logger.LogWarning("Login failed: user {UserId} has no profile", user.Id);
+            return authenticated;
+        }
+
+        public async Task<AuthenticatedUser?> GetAsync(int userId, CancellationToken cancellationToken = default)
+        {
+            var user = await _userRepo.GetByIdAsync(userId, cancellationToken);
+            return user == null ? null : await WithProfileAsync(user, cancellationToken);
+        }
+
+        private async Task<AuthenticatedUser?> WithProfileAsync(User user, CancellationToken cancellationToken)
+        {
             var profile = await _profileRepo.GetByUserIdAsync(user.Id, cancellationToken);
             if (profile == null)
-            {
-                _logger.LogWarning("Login failed: user {UserId} has no profile", user.Id);
                 return null;
-            }
 
             var today = DateOnly.FromDateTime(_timeProvider.GetUtcNow().UtcDateTime);
             return new AuthenticatedUser

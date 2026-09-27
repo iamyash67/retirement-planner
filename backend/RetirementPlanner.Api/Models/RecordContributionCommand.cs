@@ -1,4 +1,5 @@
 namespace RetirementPlanner.Models
 {
-    public record RecordContributionCommand(int GoalId, int Year, int Month, decimal Amount);
+    /// <summary>Record one month's contribution to a goal owned by UserId.</summary>
+    public record RecordContributionCommand(int UserId, int GoalId, int Year, int Month, decimal Amount);
 }

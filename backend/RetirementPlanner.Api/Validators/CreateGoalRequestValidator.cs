@@ -14,8 +14,6 @@ namespace RetirementPlanner.Validators
 
         public CreateGoalRequestValidator()
         {
-            RuleFor(r => r.ProfileId).GreaterThan(0).WithMessage("Invalid Profile ID");
-
             RuleFor(r => r.CurrentAge)
                 .GreaterThan(0).WithMessage("Age values must be positive")
                 .LessThanOrEqualTo(MaxAge).WithMessage($"Age cannot be more than {MaxAge}");

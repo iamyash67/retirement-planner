@@ -11,17 +11,20 @@ namespace RetirementPlanner.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IGoalRepository _goalRepo;
         private readonly IContributionRepository _contributionRepo;
+        private readonly TimeProvider _timeProvider;
         private readonly ILogger<ContributionService> _logger;
 
         public ContributionService(
             IUnitOfWork unitOfWork,
             IGoalRepository goalRepo,
             IContributionRepository contributionRepo,
+            TimeProvider timeProvider,
             ILogger<ContributionService> logger)
         {
             _unitOfWork = unitOfWork;
             _goalRepo = goalRepo;
             _contributionRepo = contributionRepo;
+            _timeProvider = timeProvider;
             _logger = logger;
         }
 
@@ -47,7 +50,7 @@ namespace RetirementPlanner.Services
         {
             // Locking the goal serialises concurrent requests for it, so the duplicate check below normally
             // sees any contribution committed before it. The unique key is the backstop if it doesn't.
-            var goal = await _goalRepo.GetByIdForUpdateAsync(command.GoalId, cancellationToken);
+            var goal = await _goalRepo.GetForUserForUpdateAsync(command.GoalId, command.UserId, cancellationToken);
             if (goal == null)
                 return new ContributionResult(ContributionStatus.GoalNotFound);
 
@@ -57,20 +60,20 @@ namespace RetirementPlanner.Services
             if (await _contributionRepo.ExistsAsync(command.GoalId, command.Year, command.Month, cancellationToken))
                 return new ContributionResult(ContributionStatus.AlreadyRecorded);
 
-            await _contributionRepo.CreateAsync(new Contribution
+            var contribution = new Contribution
             {
                 GoalId = command.GoalId,
                 Year = command.Year,
                 Month = command.Month,
-                Amount = command.Amount
-            }, cancellationToken);
+                Amount = command.Amount,
+                RecordedAt = _timeProvider.GetUtcNow().UtcDateTime
+            };
+            contribution.Id = await _contributionRepo.CreateAsync(contribution, cancellationToken);
 
             _logger.LogInformation("Recorded contribution for goal {GoalId}, {Year}-{Month:00}",
                 command.GoalId, command.Year, command.Month);
 
-            var updatedGoal = await _goalRepo.GetByIdAsync(command.GoalId, cancellationToken)
-                ?? throw new InvalidOperationException($"Goal {command.GoalId} disappeared inside its own transaction.");
-            return new ContributionResult(ContributionStatus.Recorded, updatedGoal);
+            return new ContributionResult(ContributionStatus.Recorded, contribution);
         }
     }
 }
